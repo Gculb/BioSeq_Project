@@ -14,6 +14,9 @@ data/references/*
 # Generated data
 data/processed/*
 results/*
+/work/
+/.nextflow/
+/.nextflow.log*
 
 # Keep directory structure in git
 !data/processed/.gitkeep

@@ -1,12 +1,14 @@
 # BioSeq Architecture
 
-BioSeq is a Python bioinformatics project with two deliberately separate
-execution paths:
+BioSeq is a bioinformatics project with three deliberately separate execution
+paths:
 
 1. A lightweight CLI that validates and summarizes one input file.
 2. An opt-in HG002 benchmark that prepares a known sample, aligns reads, calls
    small variants, and measures calls/performance against a direct-tool
    baseline and GIAB truth.
+3. A Nextflow workflow that runs a paired-donor RNA-seq differential-expression
+   analysis in R/DESeq2 from a public processed count matrix.
 
 The CLI does not implicitly download data, align reads, or call variants.
 
@@ -54,6 +56,8 @@ failure modes.
 | `bioseq.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
 | `bioseq.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
 | `containers/`, `compose.yaml` | Provide a Docker environment with pinned benchmark tool versions. |
+| `main.nf`, `nextflow.config`, `analysis/rnaseq_airway_deseq2.R` | Run the public airway RNA-seq DESeq2 analysis with Nextflow and a Docker profile. |
+| `hg002.nf` | Prepare public GIAB inputs and execute the existing HG002 baseline-versus-wrapper benchmark as a Nextflow DAG. |
 
 ## Workflow details
 
@@ -115,6 +119,21 @@ ApplyBQSR, recalibrated BAM indexing, GATK HaplotypeCaller, and VCF QC.
 same tool versions and arguments. RTG then scores each call set against truth
 inside the confident regions.
 
+`hg002.nf` provides a Nextflow entry point for the same pilot: one process
+prepares the regional public inputs, then a dependent process runs
+`bioseq.full_benchmark` in the pinned BioSeq container. That command retains
+the existing per-stage baseline and wrapper execution and truth-set evaluation.
+The preparation process is not cached because it reads mutable remote resources.
+
+### Nextflow airway RNA-seq analysis
+
+`main.nf` runs `analysis/rnaseq_airway_deseq2.R` in the
+`bioseq-rnaseq:latest` container. The analysis uses the Bioconductor airway
+processed count matrix, fits `~ cell + dex`, and writes DESeq2 results,
+summary, plots, and R session information. The `docker` profile is used locally
+and by the GitHub-hosted CI workflow. It is a separate biological analysis; it
+does not change or reuse the HG002 variant-calling results.
+
 ## Data and report layout
 
 | Path | Intended contents | Git handling |
@@ -143,6 +162,8 @@ pins Python, Biopython, psutil, BWA, samtools, bcftools, GATK, and RTG Tools in
 - BLAST uses NCBI's remote service through Biopython.
 - The full benchmark requires Docker/Compose to use the pinned toolchain and
   internet access for public input preparation.
+- The RNA-seq workflow requires Java 17, Nextflow 24.10.5, and Docker; its image
+  installs R 4.4.3, Bioconductor 3.20, airway, and DESeq2.
 
 Reproducibility depends on recording immutable input checksums, sample and
 reference assembly, genomic region, data-resource versions, tools and

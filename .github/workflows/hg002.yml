@@ -1,0 +1,51 @@
+name: BioSeq HG002 Nextflow benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hg002-regional-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Nextflow
+        uses: nf-core/setup-nextflow@v1
+        with:
+          version: "24.10.5"
+
+      - name: Build pinned BioSeq tool image
+        run: docker build -f containers/Dockerfile -t bioseq:latest .
+
+      - name: Prepare and run the HG002 pilot
+        run: |
+          nextflow run hg002.nf \
+            -profile docker \
+            --interval chr20:10000000-11000000 \
+            --threads 2 \
+            --outdir "${RUNNER_TEMP}/bioseq-hg002-results" \
+            -with-report "${RUNNER_TEMP}/hg002-nextflow-report.html" \
+            -with-trace "${RUNNER_TEMP}/hg002-nextflow-trace.txt"
+
+      - name: Verify benchmark outputs
+        run: |
+          set -euo pipefail
+          results="${RUNNER_TEMP}/bioseq-hg002-results/comparison"
+          test -s "${results}/comparison.json"
+          test -s "${results}/baseline/workflow.json"
+          test -s "${results}/bioseq/workflow.json"
+          test -s "${results}/truth_evaluation/benchmark.json"
+
+      - name: Save benchmark outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: hg002-nextflow-results
+          path: |
+            ${{ runner.temp }}/bioseq-hg002-results/
+            ${{ runner.temp }}/hg002-nextflow-report.html
+            ${{ runner.temp }}/hg002-nextflow-trace.txt

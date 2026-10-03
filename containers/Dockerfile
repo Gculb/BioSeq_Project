@@ -4,6 +4,8 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER containers/environment.yml /tmp/environment
 RUN micromamba create --yes --name bioseq --file /tmp/environment.yml && \
     micromamba clean --all --yes
 
+COPY --chown=$MAMBA_USER:$MAMBA_USER bioseq /workspace/bioseq
+
 ENV PATH=/opt/conda/envs/bioseq/bin:$PATH
 ENV PYTHONPATH=/workspace
 WORKDIR /workspace
