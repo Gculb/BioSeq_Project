@@ -7,7 +7,14 @@ from unittest.mock import patch
 
 from bioseq.alignment import align_reads, convert_sam_to_bam
 from bioseq.blast import BLAST_search
-from bioseq.samtools import depth, flagstat, index_bam, sort_bam, stats
+from bioseq.samtools import (
+    analyze_alignment,
+    depth,
+    flagstat,
+    index_bam,
+    sort_bam,
+    stats,
+)
 
 
 def successful_tool(command):
@@ -213,6 +220,37 @@ class SamtoolsTests(unittest.TestCase):
         self.assertEqual(result_path, output_path)
         with open(output_path, encoding="utf-8") as file_handle:
             self.assertEqual(file_handle.read(), depth_text)
+
+    def test_analyze_cram_uses_supplied_reference_for_temporary_bam(self):
+        cram_file = os.path.join(self.temp_dir.name, "alignments.cram")
+        reference_file = os.path.join(self.temp_dir.name, "reference.fasta")
+        with open(cram_file, "wb") as file_handle:
+            file_handle.write(b"CRAM")
+        with open(reference_file, "w", encoding="utf-8") as file_handle:
+            file_handle.write(">chr1\nACGT\n")
+
+        def convert_cram(command):
+            self.assertEqual(command[1:5], ["view", "-T", reference_file, "-b"])
+            output_path = command[6]
+            with open(output_path, "wb") as file_handle:
+                file_handle.write(b"decoded bam")
+            return ""
+
+        with patch("bioseq.samtools.quickcheck"), patch(
+            "bioseq.samtools.run_command", side_effect=convert_cram
+        ), patch(
+            "bioseq.samtools.flagstat", return_value={"mapped": {"passed": 8}}
+        ) as mock_flagstat, patch(
+            "bioseq.samtools.stats", return_value={"raw total sequences": 10}
+        ) as mock_stats:
+            result = analyze_alignment(cram_file, reference_file=reference_file)
+
+        self.assertEqual(result["flagstat"], {"mapped": {"passed": 8}})
+        self.assertEqual(result["stats"], {"raw total sequences": 10})
+        self.assertEqual(result["reference_file"], reference_file)
+        analyzed_file = mock_flagstat.call_args.args[0]
+        self.assertEqual(analyzed_file, mock_stats.call_args.args[0])
+        self.assertTrue(analyzed_file.endswith("decoded.bam"))
 
 
 if __name__ == "__main__":

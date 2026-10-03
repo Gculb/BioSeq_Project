@@ -110,6 +110,21 @@ class VariantAnalysisTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertTrue(any("#CHROM" in error for error in result["errors"]))
 
+    def test_structural_alternate_is_not_counted_as_an_indel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            filename = os.path.join(directory, "calls.vcf")
+            with open(filename, "w", encoding="utf-8") as file_handle:
+                file_handle.write(
+                    "##fileformat=VCFv4.2\n"
+                    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+                    "chr1\t10\t.\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL\n"
+                )
+
+            metrics = analyze_vcf(filename)["metrics"]
+
+        self.assertEqual(metrics["indels"], 0)
+        self.assertEqual(metrics["other_variants"], 1)
+
 
 class FastqQualityControlTests(unittest.TestCase):
     def test_quality_metrics_are_calculated(self):

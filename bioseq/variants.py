@@ -34,6 +34,7 @@ def analyze_vcf(filename):
     qual_sum = 0.0
     qual_count = 0
     header_seen = False
+    fileformat_seen = False
 
     try:
         with _open_vcf(filename) as file_handle:
@@ -41,6 +42,8 @@ def analyze_vcf(filename):
                 line = raw_line.rstrip("\r\n")
                 if not line:
                     continue
+                if line.startswith("##fileformat=VCF"):
+                    fileformat_seen = True
                 if line.startswith("##contig=<"):
                     contig_name = _metadata_value(line, "ID")
                     if contig_name:
@@ -105,7 +108,14 @@ def analyze_vcf(filename):
                     metrics["filtered_records"] += 1
 
                 for alternate in alternates:
-                    if len(reference) == 1 and len(alternate) == 1:
+                    if (
+                        alternate == "*"
+                        or alternate.startswith("<")
+                        or "[" in alternate
+                        or "]" in alternate
+                    ):
+                        metrics["other_variants"] += 1
+                    elif len(reference) == 1 and len(alternate) == 1:
                         metrics["snps"] += 1
                     elif len(reference) != len(alternate):
                         metrics["indels"] += 1
@@ -163,6 +173,8 @@ def analyze_vcf(filename):
 
     if not header_seen and not errors:
         errors.append("VCF file is missing its #CHROM header.")
+    if not fileformat_seen and not errors:
+        errors.append("VCF file is missing its ##fileformat declaration.")
     metrics["contig_count"] = len(contigs)
     metrics["mean_qual"] = qual_sum / qual_count if qual_count else None
     validation = {

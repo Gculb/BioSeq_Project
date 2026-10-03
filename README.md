@@ -15,8 +15,6 @@ run BLAST, align reads, or call variants.
 | --- | --- | --- | --- |
 | FASTA | Yes | Yes | Validate, sequence counts/lengths, GC content, JSON/text report |
 | FASTQ | Yes | Yes | Validate, read-length and Phred quality metrics, GC/ambiguous-base metrics, JSON/text report |
-| BAM | Yes, from a direct URL | No | Separate samtools wrappers can sort, index, and summarize BAMs |
-| CRAM | Yes, from a direct URL | No | No CRAM-specific pipeline workflow; a reference may be needed by tools |
 | VCF / VCF.GZ | Yes, from a direct URL | Yes | Variant-record, allele, filter, sample-genotype, and QUAL summaries; no annotation or interpretation |
 | BAM | Yes, from a direct URL | Yes | `samtools quickcheck`, `flagstat`, and `stats` summaries |
 | CRAM | Yes, from a direct URL | Yes | Same samtools summaries; may need a reference FASTA |
