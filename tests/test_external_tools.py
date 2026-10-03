@@ -319,7 +319,7 @@ class SamtoolsTests(unittest.TestCase):
 
     def test_coverage_parses_region_metrics(self):
         output = (
-            "#rname\tstart\tend\tnumreads\tcovbases\tcoverage\tmeandepth\tmeanbaseq\tmeanmapq\n"
+            "#rname\tstartpos\tendpos\tnumreads\tcovbases\tcoverage\tmeandepth\tmeanbaseq\tmeanmapq\n"
             "chr20\t10000000\t11000000\t2500\t950000\t95.0\t30.5\t35.2\t59.8\n"
         )
         with patch("bioseq.samtools.run_command", return_value=output) as command:

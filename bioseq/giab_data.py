@@ -3,6 +3,7 @@ import gzip
 import hashlib
 import json
 import os
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -15,7 +16,7 @@ GIAB_BASE = (
     "AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38"
 )
 GIAB_READS_BASE = (
-    "https://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/"
+    "https://ftp.ncbi.nlm.nih.gov/giab/ftp/data/AshkenazimTrio/"
     "HG002_NA24385_son/NIST_Illumina_2x250bps/novoalign_bams"
 )
 TRUTH_VCF_NAME = "HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
@@ -28,6 +29,7 @@ KNOWN_SITES_URL = (
     "Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
 )
 ALIGNMENT_URL = f"{GIAB_READS_BASE}/HG002.GRCh38.2x250.bam"
+READ_EXTRACTION_FLANK = 5000
 
 
 def _download(url, destination):
@@ -90,6 +92,50 @@ def _restrict_confident_regions(source_bed, output_bed, contig, start, end):
             f"GIAB confident regions do not overlap {contig}:{start}-{end}."
         )
     return kept
+
+
+def _read_extraction_region(contig, start, end):
+    padded_start = max(1, start - READ_EXTRACTION_FLANK)
+    padded_end = end + READ_EXTRACTION_FLANK
+    return f"{contig}:{padded_start}-{padded_end}"
+
+
+def _extract_paired_fastq(samtools, threads, regional_bam, read1, read2):
+    with tempfile.TemporaryDirectory(prefix="bioseq-giab-") as temporary_directory:
+        name_collated_bam = os.path.join(temporary_directory, "regional.name_collated.bam")
+        run_command(
+            [
+                samtools,
+                "collate",
+                "-@",
+                str(threads),
+                "-o",
+                name_collated_bam,
+                regional_bam,
+            ]
+        )
+        run_command(
+            [
+                samtools,
+                "fastq",
+                "-@",
+                str(threads),
+                "-f",
+                "1",
+                "-F",
+                "2304",
+                "-n",
+                "-1",
+                read1,
+                "-2",
+                read2,
+                "-0",
+                os.devnull,
+                "-s",
+                os.devnull,
+                name_collated_bam,
+            ]
+        )
 
 
 def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=2):
@@ -157,7 +203,7 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
             truth_vcf,
         ]
     )
-    run_command([bcftools, "index", "-f", regional_truth])
+    run_command([bcftools, "index", "-f", "-t", regional_truth])
     known_sites = os.path.join(output_dir, "Mills.hg38.region.vcf.gz")
     run_command(
         [
@@ -171,52 +217,32 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
             KNOWN_SITES_URL,
         ]
     )
-    run_command([bcftools, "index", "-f", known_sites])
+    run_command([bcftools, "index", "-f", "-t", known_sites])
 
     regional_bam = os.path.join(output_dir, "HG002.region.bam")
     source_bam = f"{ALIGNMENT_URL}"
+    read_extraction_region = _read_extraction_region(contig, start, end)
     run_command(
         [
             samtools,
             "view",
             "-b",
-            "-P",
             "-o",
             regional_bam,
             source_bam,
-            region,
+            read_extraction_region,
         ]
     )
     read1 = os.path.join(output_dir, "HG002_R1.fastq")
     read2 = os.path.join(output_dir, "HG002_R2.fastq")
-    run_command(
-        [
-            samtools,
-            "fastq",
-            "-@",
-            str(threads),
-            "-f",
-            "1",
-            "-F",
-            "2304",
-            "-n",
-            "-1",
-            read1,
-            "-2",
-            read2,
-            "-0",
-            os.devnull,
-            "-s",
-            os.devnull,
-            regional_bam,
-        ]
-    )
+    _extract_paired_fastq(samtools, threads, regional_bam, read1, read2)
     if not os.path.getsize(read1) or not os.path.getsize(read2):
         raise RuntimeError("GIAB region extraction produced an empty FASTQ mate.")
 
     return {
         "sample": "HG002",
         "region": region,
+        "read_extraction_region": read_extraction_region,
         "read1": read1,
         "read2": read2,
         "reference_fasta": reference_fasta,
@@ -230,8 +256,10 @@ def prepare_giab_region(output_dir, interval="chr20:10000000-11000000", threads=
         "source_reference_url": REFERENCE_URL,
         "source_known_sites_url": KNOWN_SITES_URL,
         "source_alignment_access": (
-            "The indexed 122-GB public BAM is queried by genomic interval; the "
-            "whole BAM is not intentionally downloaded."
+            "The indexed 122-GB public BAM is queried by genomic interval with "
+            "5-kb flanks; the whole BAM is not intentionally downloaded. "
+            "Mate fetching across the full BAM is avoided; the regional BAM is "
+            "name-collated before paired FASTQ extraction."
         ),
         "confident_interval_count": confident_interval_count,
         "sha256": {

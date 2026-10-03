@@ -2,6 +2,10 @@
 
 A small Python bioinformatics pipeline for reasoning about sequence data.
 
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for component and data-flow diagrams,
+and [DESIGN_NOTES.md](./DESIGN_NOTES.md) for answers to the biological and
+software questions behind the project.
+
 ## Current version
 
 The project includes FASTA/FASTQ validation and analysis, FASTQ quality control,
@@ -22,6 +26,14 @@ run BLAST, align reads, or call variants.
 The `bioseq.pipeline` analysis command does not download files automatically.
 Download and analysis remain separate steps.
 
+## GitHub Actions CLI checks
+
+The `BioSeq CLI` GitHub Actions workflow runs on pushes, pull requests, or
+manual dispatch. It installs the Python dependencies, runs the unit-test suite,
+then invokes `bioseq.pipeline` on the example FASTA and FASTQ files and checks
+that each run produced JSON and text reports. It does not download external
+datasets or run the resource-intensive GIAB benchmark.
+
 ## End-to-end HG002 germline pilot
 
 The separate `bioseq.full_benchmark` command runs a small-region short-read
@@ -41,7 +53,8 @@ GRCh38 BAM to extract pairs overlapping a one-megabase chromosome 20 region,
 then obtains the matching GIAB truth VCF/confident regions and chromosome
 reference plus the Broad GRCh38 Mills/1000G indel known-sites VCF used for
 BQSR. The known-sites VCF is a separate resource from the GIAB evaluation truth
-set. It uses indexed remote BAM/VCF access; the source BAM is listed as 122 GB,
+set. It uses indexed remote BAM/VCF access and extracts reads from a 5-kb-padded
+region, avoiding a whole-file mate search. The source BAM is listed as 122 GB,
 and the whole BAM is not intentionally downloaded, though network range
 requests may transfer substantial data. Prepared inputs are ignored by Git and
 stored locally under `data/benchmark/`.
@@ -84,11 +97,64 @@ performance deltas, and truth-set precision, sensitivity/recall, F1, and
 TP/FP/FN counts. Each measured workflow runs once; repeat with a new output
 directory and the same inputs to estimate timing variability. Data preparation
 and truth-set downloads are reported separately and are not included in the
-workflow runtime. This is a regional small-variant pilot, not a full-genome
-benchmark, a complete GATK Best Practices workflow (it uses single-sample
-regional HaplotypeCaller output rather than GVCF joint genotyping and does not
-run VQSR), or clinical validation. BLAST and downloading remain separate
-utilities; BLAST is not a read-alignment or variant-calling stage.
+workflow runtime.
+
+### HG002 chr20 pilot results
+
+The first completed run used the default one-megabase region
+`chr20:10000000-11000000`, two threads, and 141,241 paired-end read pairs
+extracted from GIAB HG002. The runs used the same pinned tools and parameters;
+the baseline invokes the command-line tools directly, while the BioSeq run
+invokes them through this project's wrappers.
+
+| Metric | Direct-tool baseline | BioSeq wrappers | Observed difference |
+| --- | ---: | ---: | ---: |
+| Workflow wall time | 327.71 s | 302.35 s | -25.36 s (-7.7%) |
+| Peak sampled process-tree RSS | 584.5 MiB | 561.6 MiB | -22.9 MiB |
+| Total intermediate/output size | 575.5 MiB | 575.5 MiB | effectively unchanged |
+| Mean alignment depth | 66.80x | 66.80x | equal |
+| Bases with at least 1x coverage | 99.9951% | 99.9951% | equal |
+| Variant records emitted | 1,749 | 1,749 | equal |
+
+RTG `vcfeval` scored both call sets against the GIAB truth set within its
+confident regions:
+
+| Accuracy metric | Baseline | BioSeq |
+| --- | ---: | ---: |
+| True positives | 1,582 | 1,582 |
+| False positives | 6 | 6 |
+| False negatives | 6 | 6 |
+| Precision | 0.9962 | 0.9962 |
+| Sensitivity (recall) | 0.9962 | 0.9962 |
+| F1 score | 0.9962 | 0.9962 |
+
+**How to read this:** precision is the proportion of called variants that
+match the truth set; sensitivity/recall is the proportion of truth-set variants
+recovered; F1 combines the two. A false positive is a call not supported by
+truth, and a false negative is a truth variant the workflow missed. The equal
+scores are expected here: both runs use the same aligner, caller, tool versions,
+and parameters, so this checks that the wrappers preserve behavior. It is not
+evidence that the wrappers improve variant accuracy.
+
+The BioSeq run was about 7.7% faster and used 22.9 MiB less peak sampled RSS in
+this single measurement. Treat those differences as preliminary, not as a
+proven performance improvement: timing can vary with machine load, caching,
+and process scheduling. RSS is sampled every 50 ms, sums process RSS (so shared
+memory may be counted more than once), and the reported peak is the largest
+stage measurement. Output size counts workflow intermediates as well as final
+files. The reported coverage is alignment coverage across the requested
+interval, not a statement that every base is callable or belongs to the GIAB
+confident regions.
+
+The combined metrics are saved in
+[`results/HG002_chr20_comparison/comparison.json`](results/HG002_chr20_comparison/comparison.json);
+per-run stage detail is in each implementation's `workflow.json`, and RTG's
+truth summaries are under `truth_evaluation/`. These numbers apply only to
+this regional pilot, not a full-genome benchmark, a complete GATK Best
+Practices workflow (it uses single-sample regional HaplotypeCaller output
+rather than GVCF joint genotyping and does not run VQSR), or clinical
+validation. BLAST and downloading remain separate utilities; BLAST is not a
+read-alignment or variant-calling stage.
 
 ## Compare variant calls against a truth set
 

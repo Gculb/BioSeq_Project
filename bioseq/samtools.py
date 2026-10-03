@@ -186,7 +186,10 @@ def coverage(bam_file, region=None):
     for line in output.splitlines():
         fields = line.split("\t")
         if fields[0].lstrip("#").casefold() == "rname":
-            header = [field.lstrip("#").casefold() for field in fields]
+            header = []
+            for field in fields:
+                field = field.lstrip("#").casefold()
+                header.append({"startpos": "start", "endpos": "end"}.get(field, field))
             if header != list(metric_names):
                 raise ValueError("samtools coverage returned an unexpected header.")
             continue
