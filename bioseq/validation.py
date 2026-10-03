@@ -1,20 +1,30 @@
 import os
 
 from .fastq import read_fastq
+from .variants import analyze_vcf
 
 
 NUCLEOTIDE_ALPHABET = set("ACGTUNRYKMSWBDHV")
 FASTQ_EXTENSIONS = {".fastq", ".fq"}
 FASTA_EXTENSIONS = {".fasta", ".fa", ".fna"}
+ALIGNMENT_EXTENSIONS = {".bam", ".cram"}
 
 
 def detect_sequence_format(filename):
     """Return the format indicated by a supported sequence-file extension."""
-    extension = os.path.splitext(os.fspath(filename))[1].lower()
+    filename = os.fspath(filename).lower()
+    basename = os.path.basename(filename)
+    if basename.endswith(".vcf.gz"):
+        return "vcf"
+    extension = os.path.splitext(filename)[1]
     if extension in FASTA_EXTENSIONS:
         return "fasta"
     if extension in FASTQ_EXTENSIONS:
         return "fastq"
+    if extension == ".vcf":
+        return "vcf"
+    if extension in ALIGNMENT_EXTENSIONS:
+        return extension[1:]
     raise ValueError(f"Unsupported sequence file extension: {extension or '(none)'}")
 
 
@@ -26,8 +36,8 @@ def validate_sequence_file(filename, file_format=None):
 
     if file_format is None:
         file_format = detect_sequence_format(filename)
-    elif file_format not in {"fasta", "fastq"}:
-        raise ValueError("file_format must be 'fasta' or 'fastq'.")
+    elif file_format not in {"fasta", "fastq", "vcf", "bam", "cram"}:
+        raise ValueError("file_format must be fasta, fastq, vcf, bam, or cram.")
 
     errors = []
     record_count = 0
@@ -56,13 +66,23 @@ def validate_sequence_file(filename, file_format=None):
                         f"FASTQ record {index} contains characters outside the "
                         "Phred+33 quality range."
                     )
-        else:
+        elif file_format == "fasta":
             record_count, fasta_errors = _validate_fasta(filename)
             errors.extend(fasta_errors)
+        elif file_format == "vcf":
+            result = analyze_vcf(filename)
+            return result["validation"]
+        else:
+            from .samtools import quickcheck
+
+            quickcheck(filename)
+            record_count = None
     except (UnicodeError, ValueError) as exc:
         errors.append(str(exc))
+    except RuntimeError as exc:
+        errors.append(str(exc))
 
-    if record_count == 0 and not errors:
+    if record_count == 0 and not errors and file_format in {"fasta", "fastq"}:
         errors.append(f"File contains no {file_format.upper()} records.")
 
     return {

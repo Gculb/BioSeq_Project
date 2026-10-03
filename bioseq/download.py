@@ -4,12 +4,18 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 
 from Bio import Entrez
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+DOWNLOAD_TIMEOUT_SECONDS = 60
 
 
 def _fastq_output_paths(output_dir, run_accession):
@@ -28,6 +34,157 @@ def _resolve_output_dir(output_dir=None):
 
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
+
+
+def _download_url_file(url, output_dir, filename, allowed_extensions, file_type):
+    if not isinstance(url, str):
+        raise ValueError(f"{file_type} URL must be a string.")
+    url = url.strip()
+    parsed_url = urllib.parse.urlsplit(url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+        raise ValueError(f"{file_type} URL must be an absolute HTTP or HTTPS URL.")
+    if parsed_url.username or parsed_url.password:
+        raise ValueError(f"{file_type} URL must not include embedded credentials.")
+
+    if filename is None:
+        filename = os.path.basename(urllib.parse.unquote(parsed_url.path))
+    if not filename or filename in {".", ".."} or os.path.basename(filename) != filename:
+        raise ValueError("filename must be a plain file name without directory paths.")
+
+    normalized_filename = filename.lower()
+    if not any(normalized_filename.endswith(ext) for ext in allowed_extensions):
+        allowed = ", ".join(allowed_extensions)
+        raise ValueError(f"{file_type} filename must end with one of: {allowed}.")
+
+    output_dir = _resolve_output_dir(output_dir)
+    output_path = os.path.abspath(os.path.join(output_dir, filename))
+    if os.path.exists(output_path):
+        raise FileExistsError(f"Output file already exists: {output_path}")
+
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "BioSeq/1.0 (sequence data downloader)"},
+    )
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=f".{filename}.", suffix=".part", dir=output_dir
+    )
+    os.close(descriptor)
+    downloaded_bytes = 0
+    try:
+        with urllib.request.urlopen(
+            request, timeout=DOWNLOAD_TIMEOUT_SECONDS
+        ) as response, open(temporary_path, "wb") as output:
+            while chunk := response.read(DOWNLOAD_CHUNK_SIZE):
+                output.write(chunk)
+                downloaded_bytes += len(chunk)
+
+        if not downloaded_bytes:
+            raise ValueError(f"Downloaded {file_type} file is empty: {url}")
+
+        _validate_downloaded_file(temporary_path, filename, file_type)
+        if os.path.exists(output_path):
+            raise FileExistsError(f"Output file already exists: {output_path}")
+        os.replace(temporary_path, output_path)
+    except urllib.error.URLError as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(f"Failed to download {file_type} file from {url}: {reason}") from exc
+    finally:
+        if os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+
+    return output_path
+
+
+def _validate_downloaded_file(file_path, filename, file_type):
+    lowered_name = filename.lower()
+    if file_type == "VCF":
+        if lowered_name.endswith(".vcf.gz"):
+            import gzip
+
+            opener = gzip.open
+        else:
+            opener = open
+
+        try:
+            with opener(file_path, "rb") as file_handle:
+                header = file_handle.readline(1024)
+        except (OSError, EOFError) as exc:
+            raise ValueError(f"Downloaded file is not a readable VCF: {filename}") from exc
+
+        if not header.startswith(b"##fileformat=VCF"):
+            raise ValueError(f"Downloaded file does not have a VCF header: {filename}")
+        return
+
+    if lowered_name.endswith(".cram"):
+        with open(file_path, "rb") as file_handle:
+            signature = file_handle.read(4)
+        if signature != b"CRAM":
+            raise ValueError(f"Downloaded file does not have a CRAM signature: {filename}")
+        return
+
+    import gzip
+
+    try:
+        with gzip.open(file_path, "rb") as file_handle:
+            signature = file_handle.read(4)
+    except (OSError, EOFError) as exc:
+        raise ValueError(f"Downloaded file is not a valid compressed BAM: {filename}") from exc
+    if signature != b"BAM\x01":
+        raise ValueError(f"Downloaded file does not have a BAM signature: {filename}")
+
+
+def download_variant_vcf(url, output_dir=None, filename=None):
+    """Download a VCF or compressed VCF from a direct HTTP(S) URL.
+
+    By default, variant files are saved in ``data/variants/``.
+    """
+    return _download_url_file(
+        url,
+        output_dir or os.path.join(DEFAULT_DATA_DIR, "variants"),
+        filename,
+        (".vcf", ".vcf.gz"),
+        "VCF",
+    )
+
+
+def download_variants(urls, output_dir=None):
+    """Download multiple VCF files and return their paths."""
+    if isinstance(urls, str):
+        urls = [urls]
+    if urls is None:
+        return []
+
+    return [
+        download_variant_vcf(url, output_dir=output_dir)
+        for url in urls
+        if url is not None and str(url).strip()
+    ]
+
+
+def download_alignment_file(url, output_dir=None, filename=None):
+    """Download an aligned BAM or CRAM file from a direct HTTP(S) URL.
+
+    By default, alignments are saved in ``data/alignments/``. BAM files may
+    be coordinate sorted and indexed afterward using ``bioseq.samtools``.
+    """
+    return _download_url_file(
+        url,
+        output_dir or os.path.join(DEFAULT_DATA_DIR, "alignments"),
+        filename,
+        (".bam", ".cram"),
+        "alignment",
+    )
+
+
+def download_bam(url, output_dir=None, filename=None):
+    """Download a BAM file from a direct HTTP(S) URL."""
+    return _download_url_file(
+        url,
+        output_dir or os.path.join(DEFAULT_DATA_DIR, "alignments"),
+        filename,
+        (".bam",),
+        "BAM",
+    )
 
 
 def search_sequences(term, email, database="nucleotide", retmax=10):
@@ -194,6 +351,42 @@ def main():
         "--threads", type=int, default=1, help="Number of fasterq-dump threads"
     )
 
+    variants_parser = subparsers.add_parser(
+        "variants", help="Download one or more VCF files from direct URLs"
+    )
+    variants_parser.add_argument(
+        "urls", nargs="+", help="HTTP(S) URLs ending in .vcf or .vcf.gz"
+    )
+    variants_parser.add_argument(
+        "--dir",
+        default="data/variants",
+        help="Destination directory relative to the project root",
+    )
+
+    bam_parser = subparsers.add_parser(
+        "bam", help="Download one or more BAM files from direct URLs"
+    )
+    bam_parser.add_argument(
+        "urls", nargs="+", help="HTTP(S) URLs ending in .bam"
+    )
+    bam_parser.add_argument(
+        "--dir",
+        default="data/alignments",
+        help="Destination directory relative to the project root",
+    )
+
+    alignment_parser = subparsers.add_parser(
+        "alignment", help="Download one or more BAM or CRAM files from direct URLs"
+    )
+    alignment_parser.add_argument(
+        "urls", nargs="+", help="HTTP(S) URLs ending in .bam or .cram"
+    )
+    alignment_parser.add_argument(
+        "--dir",
+        default="data/alignments",
+        help="Destination directory relative to the project root",
+    )
+
     args = parser.parse_args()
 
     if args.command == "search":
@@ -217,6 +410,22 @@ def main():
         )
         for path in paths:
             print(path)
+        return
+
+    if args.command == "variants":
+        paths = download_variants(args.urls, output_dir=args.dir)
+        for path in paths:
+            print(path)
+        return
+
+    if args.command == "bam":
+        for url in args.urls:
+            print(download_bam(url, output_dir=args.dir))
+        return
+
+    if args.command == "alignment":
+        for url in args.urls:
+            print(download_alignment_file(url, output_dir=args.dir))
         return
 
     parser.error("Unknown command")
