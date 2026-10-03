@@ -1,32 +1,30 @@
 def read_fastq(filename):
     reads = []
 
-    with open(filename, "r") as file:
-        identifier = file.readline().strip()
+    with open(filename, "r", encoding="utf-8") as file_handle:
+        lines = [line.rstrip("\r\n") for line in file_handle]
 
-        while identifier:
-            sequence = file.readline().strip()
-            plus = file.readline().strip()
-            quality = file.readline().strip()
+    if len(lines) % 4:
+        raise ValueError("FASTQ file ends with an incomplete four-line record.")
 
-            if not identifier.startswith("@"):
-                raise ValueError("Invalid FASTQ identifier")
+    for index in range(0, len(lines), 4):
+        identifier, sequence, plus, quality = lines[index : index + 4]
+        record_number = index // 4 + 1
 
-            if plus != "+":
-                raise ValueError("Invalid FASTQ format")
+        if not identifier.startswith("@") or len(identifier) == 1:
+            raise ValueError(f"Invalid FASTQ identifier on record {record_number}.")
 
-            if len(sequence) != len(quality):
-                raise ValueError(
-                    f"Sequence and quality lengths do not match for {identifier}"
-                )
+        if not plus.startswith("+"):
+            raise ValueError(f"Invalid FASTQ separator on record {record_number}.")
 
-            reads.append({
-                "id": identifier[1:],
-                "sequence": sequence,
-                "quality": quality
-            })
+        if len(sequence) != len(quality):
+            raise ValueError(
+                f"Sequence and quality lengths do not match for {identifier}"
+            )
 
-            identifier = file.readline().strip()
+        reads.append(
+            {"id": identifier[1:], "sequence": sequence, "quality": quality}
+        )
 
     return reads
 

@@ -10,10 +10,10 @@ def analyze_fasta(filename):
 
     print("\nFASTA Analysis")
     print("================")
-    print(f"Sequences:       {stats["count"]}")
-    print(f"Minimum length:  {stats["min_length"]} bp")
-    print(f"Maximum length:  {stats["max_length"]} bp")
-    print(f"Mean length:     {stats["mean_length"]:.2f} bp")
+    print(f"Sequences:       {stats['count']}")
+    print(f"Minimum length:  {stats['min_length']} bp")
+    print(f"Maximum length:  {stats['max_length']} bp")
+    print(f"Mean length:     {stats['mean_length']:.2f} bp")
 
 
 def analyze_fastq(filename):

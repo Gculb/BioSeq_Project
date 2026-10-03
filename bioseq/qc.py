@@ -1,49 +1,53 @@
-# TODO:
-# Implement FASTQ quality-control analysis.
-#
-# Potential outputs:
-# - read count
-# - read length distribution
-# - mean quality
-# - quality distribution
-# - GC content
-# - ambiguous bases
-# - percentage of low-quality reads
-#
-# Think about what each measurement tells us biologically.
+from collections import Counter
+
+from .fastq import read_fastq
 
 
+def analyze_fastq_quality(fastq_file, minimum_mean_quality=20):
+    """Calculate read-length, base-quality, GC, and ambiguity metrics.
 
-def analyze_fastq_quality(fastq_file):
+    Quality characters are interpreted as Phred+33. A read is low quality when
+    its mean per-base Phred score is below ``minimum_mean_quality``. GC percent
+    uses all sequence bases as its denominator; ambiguous bases count bases
+    other than A, C, G, and T.
     """
-    Analyze the quality of a FASTQ file.
+    if minimum_mean_quality < 0:
+        raise ValueError("minimum_mean_quality must not be negative.")
 
-    Parameters:
-    - fastq_file: Path to the FASTQ file to analyze.
+    reads = read_fastq(fastq_file)
+    read_lengths = Counter()
+    quality_distribution = Counter()
+    total_bases = 0
+    gc_bases = 0
+    ambiguous_bases = 0
+    low_quality_reads = 0
+    total_quality = 0
 
-    Returns:
-    - A dictionary containing quality metrics.
-    """
-    # Placeholder for actual implementation
-    read_count = 0
-    read_length_distribution = {}
-    with open(fastq_file, 'r') as f:
-        for line in f:
-            if line.startswith('@'):
-                read_count += 1
-            elif line.startswith('+'):
-                continue
-            else:
-                read_length = len(line.strip())
-                read_length_distribution[read_length] = read_length_distribution.get(read_length, 0) + 1
-            
-    quality_metrics = {
+    for read in reads:
+        sequence = read["sequence"].upper()
+        quality_scores = [ord(character) - 33 for character in read["quality"]]
+        read_lengths[len(sequence)] += 1
+        total_bases += len(sequence)
+        gc_bases += sequence.count("G") + sequence.count("C")
+        ambiguous_bases += sum(base not in "ACGT" for base in sequence)
+        quality_distribution.update(quality_scores)
+        total_quality += sum(quality_scores)
+
+        mean_read_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+        if mean_read_quality < minimum_mean_quality:
+            low_quality_reads += 1
+
+    read_count = len(reads)
+    return {
         "read_count": read_count,
-        "read_length_distribution": read_length_distribution,
-        "mean_quality": 0.0,
-        "quality_distribution": {},
-        "gc_content": 0.0,
-        "ambiguous_bases": 0,
-        "low_quality_percentage": 0.0
+        "total_bases": total_bases,
+        "read_length_distribution": dict(sorted(read_lengths.items())),
+        "mean_read_length": total_bases / read_count if read_count else 0,
+        "mean_quality": total_quality / total_bases if total_bases else 0,
+        "quality_distribution": dict(sorted(quality_distribution.items())),
+        "gc_content": (gc_bases / total_bases * 100) if total_bases else 0,
+        "ambiguous_bases": ambiguous_bases,
+        "low_quality_reads": low_quality_reads,
+        "low_quality_percentage": (low_quality_reads / read_count * 100) if read_count else 0,
+        "minimum_mean_quality": minimum_mean_quality,
     }
-    return quality_metrics

@@ -1,3 +1,2 @@
-# Core starter pipeline currently uses only Python's standard library.
-# Add third-party packages here as the project grows.
+# Biopython is used for NCBI Entrez sequence searches and downloads.
 biopython>=1.83

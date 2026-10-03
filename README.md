@@ -22,9 +22,10 @@ Biological interpretation
 
 ## Current version
 
-The starter implementation includes basic FASTA and FASTQ parsing and statistics,
-along with NCBI FASTA and SRA FASTQ download helpers. BLAST, samtools, filtering,
-alignment, reporting, and interpretation remain to be implemented.
+The project includes FASTA/FASTQ validation and analysis, FASTQ quality control,
+NCBI FASTA and SRA FASTQ download helpers, and JSON/text pipeline reports.
+BLAST, alignment, and samtools integration are not part of the current local
+pipeline yet.
 
 ## Run
 
@@ -39,6 +40,23 @@ or:
 ```bash
 python -m bioseq.cli data/raw/example.fastq
 ```
+
+Run the local validation, analysis, and reporting workflow:
+
+```bash
+python -m bioseq.pipeline data/raw/example.fastq
+```
+
+Reports are written to `results/` by default. Override the destination or the
+mean-read Phred threshold used for FASTQ low-quality percentages with:
+
+```bash
+python -m bioseq.pipeline data/raw/example.fastq \
+  --results-dir results \
+  --minimum-mean-quality 20
+```
+
+The equivalent convenience script is `python scripts/run_pipeline.py <input>`.
 
 ## Download sequence data
 
