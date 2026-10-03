@@ -32,20 +32,23 @@ pipeline yet.
 From this directory:
 
 ```bash
-python -m bioseq.cli data/raw/example.fasta
+python -m bioseq.cli data/examples/example.fasta
 ```
 
 or:
 
 ```bash
-python -m bioseq.cli data/raw/example.fastq
+python -m bioseq.cli data/examples/example.fastq
 ```
 
 Run the local validation, analysis, and reporting workflow:
 
 ```bash
-python -m bioseq.pipeline data/raw/example.fastq
+python -m bioseq.pipeline data/examples/example.fastq
 ```
+
+The repository includes small synthetic FASTA and FASTQ examples under
+`data/examples/`; input files in `data/raw/` remain ignored and local.
 
 Reports are written to `results/` by default. Override the destination or the
 mean-read Phred threshold used for FASTQ low-quality percentages with:
