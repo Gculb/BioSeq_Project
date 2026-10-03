@@ -1,2 +1,3 @@
 # Biopython is used for NCBI Entrez sequence searches and downloads.
 biopython>=1.83
+psutil>=6.0

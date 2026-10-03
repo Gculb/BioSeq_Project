@@ -5,13 +5,16 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from bioseq.alignment import align_reads, convert_sam_to_bam
+from bioseq.alignment import align_reads, convert_sam_to_bam, index_reference
 from bioseq.blast import BLAST_search
 from bioseq.samtools import (
     analyze_alignment,
+    coverage,
     depth,
+    fixmate,
     flagstat,
     index_bam,
+    mark_duplicates,
     sort_bam,
     stats,
 )
@@ -94,6 +97,37 @@ class AlignmentTests(unittest.TestCase):
         )
         self.assertEqual(run_command.call_args.kwargs["stdout_path"], output)
 
+    def test_align_reads_passes_read_group_header(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reads = [os.path.join(directory, f"reads_{mate}.fastq") for mate in (1, 2)]
+            reference = os.path.join(directory, "reference.fasta")
+            output = os.path.join(directory, "aligned.sam")
+            for path in [*reads, reference, f"{reference}.bwt"]:
+                with open(path, "w", encoding="utf-8") as file_handle:
+                    file_handle.write("fixture\n")
+            read_group = "@RG\\tID:sample\\tSM:sample\\tPL:ILLUMINA"
+            with patch("bioseq.alignment.require_executable", return_value="bwa"), patch(
+                "bioseq.alignment.run_command", return_value=output
+            ) as run_command:
+                align_reads(reads, reference, output, read_group=read_group)
+
+        self.assertEqual(
+            run_command.call_args.args[0][2:4], ["-R", read_group]
+        )
+
+    def test_index_reference_invokes_bwa_index(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reference = os.path.join(directory, "reference.fasta")
+            with open(reference, "w", encoding="utf-8") as file_handle:
+                file_handle.write(">chr1\nACGT\n")
+            with patch("bioseq.alignment.require_executable", return_value="bwa"), patch(
+                "bioseq.alignment.run_command"
+            ) as run_command:
+                result = index_reference(reference)
+
+        self.assertEqual(result, reference)
+        self.assertEqual(run_command.call_args.args[0], ["bwa", "index", reference])
+
     def test_bwa_requires_an_index(self):
         with tempfile.TemporaryDirectory() as directory:
             reads = os.path.join(directory, "reads.fastq")
@@ -163,6 +197,33 @@ class SamtoolsTests(unittest.TestCase):
 
         self.assertEqual(sorted_bam, os.path.join(self.temp_dir.name, "alignments.sorted.bam"))
         self.assertTrue(os.path.isfile(sorted_bam))
+
+    def test_name_sort_uses_name_order_flag(self):
+        with patch("bioseq.samtools.run_command", side_effect=successful_tool) as command:
+            sorted_bam = sort_bam(self.bam, by_name=True)
+
+        self.assertTrue(sorted_bam.endswith(".name_sorted.bam"))
+        self.assertIn("-n", command.call_args.args[0])
+
+    def test_fixmate_and_mark_duplicates_use_samtools(self):
+        fixmate_output = os.path.join(self.temp_dir.name, "fixmate.bam")
+        marked_output = os.path.join(self.temp_dir.name, "marked.bam")
+
+        def create_last_output(command):
+            with open(command[-1], "wb") as file_handle:
+                file_handle.write(b"tool output")
+            return ""
+
+        with patch("bioseq.samtools.run_command", side_effect=create_last_output) as command:
+            self.assertEqual(fixmate(self.bam, fixmate_output), fixmate_output)
+            self.assertEqual(command.call_args.args[0][1], "fixmate")
+            self.assertIn("-m", command.call_args.args[0])
+
+        with patch("bioseq.samtools.run_command", side_effect=create_last_output) as command:
+            self.assertEqual(
+                mark_duplicates(self.bam, marked_output), marked_output
+            )
+            self.assertEqual(command.call_args.args[0][1], "markdup")
 
     def test_index_bam_creates_index(self):
         with patch("bioseq.samtools.run_command", side_effect=successful_tool):
@@ -242,15 +303,45 @@ class SamtoolsTests(unittest.TestCase):
             "bioseq.samtools.flagstat", return_value={"mapped": {"passed": 8}}
         ) as mock_flagstat, patch(
             "bioseq.samtools.stats", return_value={"raw total sequences": 10}
-        ) as mock_stats:
+        ) as mock_stats, patch(
+            "bioseq.samtools.coverage", return_value=[{"reference": "chr1"}]
+        ) as mock_coverage:
             result = analyze_alignment(cram_file, reference_file=reference_file)
 
         self.assertEqual(result["flagstat"], {"mapped": {"passed": 8}})
         self.assertEqual(result["stats"], {"raw total sequences": 10})
+        self.assertEqual(result["coverage"], [{"reference": "chr1"}])
         self.assertEqual(result["reference_file"], reference_file)
         analyzed_file = mock_flagstat.call_args.args[0]
         self.assertEqual(analyzed_file, mock_stats.call_args.args[0])
         self.assertTrue(analyzed_file.endswith("decoded.bam"))
+        mock_coverage.assert_called_once_with(analyzed_file, region=None)
+
+    def test_coverage_parses_region_metrics(self):
+        output = (
+            "#rname\tstart\tend\tnumreads\tcovbases\tcoverage\tmeandepth\tmeanbaseq\tmeanmapq\n"
+            "chr20\t10000000\t11000000\t2500\t950000\t95.0\t30.5\t35.2\t59.8\n"
+        )
+        with patch("bioseq.samtools.run_command", return_value=output) as command:
+            result = coverage(self.bam, region="chr20:10000000-11000000")
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "reference": "chr20",
+                    "start": 10000000,
+                    "end": 11000000,
+                    "read_count": 2500,
+                    "covered_bases": 950000,
+                    "coverage_percent": 95.0,
+                    "mean_depth": 30.5,
+                    "mean_base_quality": 35.2,
+                    "mean_mapping_quality": 59.8,
+                }
+            ],
+        )
+        self.assertIn("-r", command.call_args.args[0])
 
 
 if __name__ == "__main__":

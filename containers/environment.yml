@@ -1,0 +1,13 @@
+name: bioseq
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - biopython=1.88
+  - psutil=6.1.1
+  - bwa=0.7.17
+  - samtools=1.20
+  - bcftools=1.20
+  - gatk4=4.5.0.0
+  - rtg-tools=3.12.1

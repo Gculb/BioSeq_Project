@@ -22,6 +22,105 @@ run BLAST, align reads, or call variants.
 The `bioseq.pipeline` analysis command does not download files automatically.
 Download and analysis remain separate steps.
 
+## End-to-end HG002 germline pilot
+
+The separate `bioseq.full_benchmark` command runs a small-region short-read
+workflow using BioSeq's BWA/samtools wrappers and GATK HaplotypeCaller, then
+compares its calls to a direct-command baseline and the GIAB HG002 truth set.
+The compared workflows use the same tool versions and parameters; this tests
+wrapper parity and overhead, not a claim that BioSeq changes caller accuracy.
+The pipeline measures paired FASTQ QC, alignment and duplicate-marking stages,
+samtools mapping/coverage metrics, variant metrics, and per-stage elapsed time,
+CPU time, sampled peak process-tree RSS, and output size. Reports include
+software versions and SHA-256 hashes for inputs. Peak memory is sampled every
+50 ms and may miss short-lived peaks; process-tree RSS sums process RSS and can
+double-count shared memory.
+
+The included data-preparation command uses the public GIAB HG002 2x250-bp
+GRCh38 BAM to extract pairs overlapping a one-megabase chromosome 20 region,
+then obtains the matching GIAB truth VCF/confident regions and chromosome
+reference plus the Broad GRCh38 Mills/1000G indel known-sites VCF used for
+BQSR. The known-sites VCF is a separate resource from the GIAB evaluation truth
+set. It uses indexed remote BAM/VCF access; the source BAM is listed as 122 GB,
+and the whole BAM is not intentionally downloaded, though network range
+requests may transfer substantial data. Prepared inputs are ignored by Git and
+stored locally under `data/benchmark/`.
+
+On Windows, start Docker Desktop with its Linux engine first. Build the pinned
+tool environment:
+
+```powershell
+docker compose build bioseq
+```
+
+Prepare the default `chr20:10000000-11000000` pilot (use a new output directory
+if you prepare it again):
+
+```powershell
+docker compose run --rm bioseq python -m bioseq.giab_data `
+  --interval chr20:10000000-11000000 `
+  --threads 2 `
+  --output-dir data/benchmark/giab_hg002_chr20
+```
+
+Run the BioSeq workflow and baseline, then score both call sets against GIAB:
+
+```powershell
+docker compose run --rm bioseq python -m bioseq.full_benchmark `
+  --read1 data/benchmark/giab_hg002_chr20/HG002_R1.fastq `
+  --read2 data/benchmark/giab_hg002_chr20/HG002_R2.fastq `
+  --reference-fasta data/benchmark/giab_hg002_chr20/chr20.fa `
+  --known-sites-vcf data/benchmark/giab_hg002_chr20/Mills.hg38.region.vcf.gz `
+  --reference-sdf data/benchmark/giab_hg002_chr20/chr20.sdf `
+  --truth-vcf data/benchmark/giab_hg002_chr20/HG002.truth.region.vcf.gz `
+  --confident-regions data/benchmark/giab_hg002_chr20/HG002_chr20_10000000_11000000.confident.bed `
+  --interval chr20:10000000-11000000 `
+  --threads 2 `
+  --output-dir results/HG002_chr20_comparison
+```
+
+The comparison JSON contains baseline and BioSeq run manifests, stage-level
+performance deltas, and truth-set precision, sensitivity/recall, F1, and
+TP/FP/FN counts. Each measured workflow runs once; repeat with a new output
+directory and the same inputs to estimate timing variability. Data preparation
+and truth-set downloads are reported separately and are not included in the
+workflow runtime. This is a regional small-variant pilot, not a full-genome
+benchmark, a complete GATK Best Practices workflow (it uses single-sample
+regional HaplotypeCaller output rather than GVCF joint genotyping and does not
+run VQSR), or clinical validation. BLAST and downloading remain separate
+utilities; BLAST is not a read-alignment or variant-calling stage.
+
+## Compare variant calls against a truth set
+
+`bioseq.benchmark` compares a baseline caller VCF and a candidate caller VCF
+against the same trusted truth VCF using RTG `vcfeval`. It reports true-positive,
+false-positive, and false-negative counts plus precision, sensitivity/recall,
+F1, and candidate-minus-baseline deltas. This evaluates call-set accuracy; it
+does not measure runtime or show that `bioseq.pipeline` itself improved, since
+the pipeline currently summarizes VCFs rather than calling variants.
+
+Install RTG Tools and Java, prepare an RTG SDF from the matching reference
+assembly, and use the truth set's confident regions where available:
+
+```bash
+rtg format -o data/references/GRCh38.sdf data/references/GRCh38.fa
+python -m bioseq.benchmark \
+  --truth data/benchmark/HG002.truth.vcf.gz \
+  --baseline data/benchmark/baseline.vcf.gz \
+  --candidate data/benchmark/candidate.vcf.gz \
+  --reference data/references/GRCh38.sdf \
+  --regions data/benchmark/HG002.confident_regions.bed \
+  --output-dir results/HG002_benchmark
+```
+
+Use VCFs for the same sample and genome assembly, and do not compare results
+outside the regions where the truth set is considered reliable. The current
+benchmark command accepts single-sample VCFs and preserves RTG's per-run
+`summary.txt` files alongside `benchmark.json`. Output directories are not
+overwritten. RTG evaluates PASS variants by default, so keep filtering choices
+consistent between baseline and candidate call sets. Results depend on the RTG
+version, inputs, reference, and regions; record these when comparing runs.
+
 Optional external-tool methods are available in `bioseq/blast.py`,
 `bioseq/alignment.py`, and `bioseq/samtools.py`. `BLAST_search` submits a remote
 query to NCBI; it requires an internet connection and is subject to NCBI usage
@@ -157,5 +256,5 @@ report.
 ## Next steps
 
 1. Add variant annotation and filtering using an explicitly selected database.
-2. Optionally orchestrate downloading, read alignment, and BAM QC in one run.
+2. Optionally orchestrate downloading, read alignment, variant calling, and QC.
 3. Add biological interpretation while keeping it separate from raw metrics.

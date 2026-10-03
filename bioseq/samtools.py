@@ -28,20 +28,50 @@ def quickcheck(alignment_file):
     return True
 
 
-def sort_bam(input_bam, output_bam=None):
-    """Sort a BAM with samtools and return the absolute sorted BAM path."""
+def sort_bam(input_bam, output_bam=None, by_name=False):
+    """Sort a BAM by coordinate or read name and return the output path."""
     input_bam = require_file(input_bam, "BAM")
     if output_bam is None:
-        output_bam = default_output_path(input_bam, ".sorted.bam")
+        suffix = ".name_sorted.bam" if by_name else ".sorted.bam"
+        output_bam = default_output_path(input_bam, suffix)
     output_bam = os.path.abspath(os.fspath(output_bam))
     if output_bam == input_bam:
         raise ValueError("output_bam must not overwrite the input BAM file.")
 
     samtools = _resolve_samtools()
+    command = [samtools, "sort"]
+    if by_name:
+        command.append("-n")
+    command.extend(["-O", "BAM", "-o"])
+    with staged_output_path(output_bam) as temporary_path:
+        command.extend([temporary_path, input_bam])
+        run_command(command)
+    return output_bam
+
+
+def fixmate(input_bam, output_bam):
+    """Add mate tags required by samtools markdup."""
+    input_bam = require_file(input_bam, "Name-sorted BAM")
+    output_bam = os.path.abspath(os.fspath(output_bam))
+    if output_bam == input_bam:
+        raise ValueError("output_bam must not overwrite the input BAM file.")
+    samtools = _resolve_samtools()
     with staged_output_path(output_bam) as temporary_path:
         run_command(
-            [samtools, "sort", "-O", "BAM", "-o", temporary_path, input_bam]
+            [samtools, "fixmate", "-m", "-O", "BAM", input_bam, temporary_path]
         )
+    return output_bam
+
+
+def mark_duplicates(input_bam, output_bam):
+    """Mark duplicate reads in a coordinate-sorted BAM."""
+    input_bam = require_file(input_bam, "Coordinate-sorted BAM")
+    output_bam = os.path.abspath(os.fspath(output_bam))
+    if output_bam == input_bam:
+        raise ValueError("output_bam must not overwrite the input BAM file.")
+    samtools = _resolve_samtools()
+    with staged_output_path(output_bam) as temporary_path:
+        run_command([samtools, "markdup", input_bam, temporary_path])
     return output_bam
 
 
@@ -126,6 +156,60 @@ def stats(bam_file):
     return metrics
 
 
+def coverage(bam_file, region=None):
+    """Return per-reference coverage metrics from ``samtools coverage``."""
+    bam_file = require_file(bam_file, "BAM")
+    samtools = _resolve_samtools()
+    command = [samtools, "coverage"]
+    if region is not None:
+        if not isinstance(region, str) or not region.strip():
+            raise ValueError("region must be a non-empty genomic interval.")
+        command.extend(["-r", region])
+    command.append(bam_file)
+    output = run_command(command)
+
+    header = None
+    summaries = []
+    metric_names = {
+        "rname": "reference",
+        "start": "start",
+        "end": "end",
+        "numreads": "read_count",
+        "covbases": "covered_bases",
+        "coverage": "coverage_percent",
+        "meandepth": "mean_depth",
+        "meanbaseq": "mean_base_quality",
+        "meanmapq": "mean_mapping_quality",
+    }
+    integer_fields = {"start", "end", "numreads", "covbases"}
+    float_fields = {"coverage", "meandepth", "meanbaseq", "meanmapq"}
+    for line in output.splitlines():
+        fields = line.split("\t")
+        if fields[0].lstrip("#").casefold() == "rname":
+            header = [field.lstrip("#").casefold() for field in fields]
+            if header != list(metric_names):
+                raise ValueError("samtools coverage returned an unexpected header.")
+            continue
+        if not fields or not fields[0].strip():
+            continue
+        if header is None or len(fields) != len(header):
+            raise ValueError("samtools coverage returned an invalid summary row.")
+        row = {}
+        for key, value in zip(header, fields):
+            if key == "rname":
+                row[metric_names[key]] = value
+            elif value == ".":
+                row[metric_names[key]] = None
+            elif key in integer_fields:
+                row[metric_names[key]] = int(value)
+            elif key in float_fields:
+                row[metric_names[key]] = float(value)
+        summaries.append(row)
+    if not summaries:
+        raise ValueError("samtools coverage returned no parseable summary rows.")
+    return summaries
+
+
 def depth(bam_file, output_file=None):
     """Run samtools depth, returning tab-separated text or writing it to a file.
 
@@ -144,7 +228,7 @@ def depth(bam_file, output_file=None):
     return run_command(command, stdout_path=output_file)
 
 
-def analyze_alignment(alignment_file, reference_file=None):
+def analyze_alignment(alignment_file, reference_file=None, region=None):
     """Validate and summarize a BAM or CRAM using samtools.
 
     CRAMs can use a local reference FASTA supplied with ``reference_file``.
@@ -180,11 +264,13 @@ def analyze_alignment(alignment_file, reference_file=None):
             metrics = {
                 "flagstat": flagstat(decoded_bam),
                 "stats": stats(decoded_bam),
+                "coverage": coverage(decoded_bam, region=region),
             }
     else:
         metrics = {
             "flagstat": flagstat(analysis_file),
             "stats": stats(analysis_file),
+            "coverage": coverage(analysis_file, region=region),
         }
 
     metrics["reference_file"] = (

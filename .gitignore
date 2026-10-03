@@ -8,6 +8,8 @@ data/raw/*
 data/interim/*
 data/processed/*
 data/results/*
+data/benchmark/*
+data/references/*
 
 # Generated data
 data/processed/*

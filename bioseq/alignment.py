@@ -9,7 +9,14 @@ from ._external import (
 )
 
 
-def align_reads(reads_file, reference_file, output_sam, aligner="bwa", threads=1):
+def align_reads(
+    reads_file,
+    reference_file,
+    output_sam,
+    aligner="bwa",
+    threads=1,
+    read_group=None,
+):
     """Align one or two FASTQ files to a reference with BWA-MEM or minimap2.
 
     Returns the absolute path to the generated SAM file. BWA references must
@@ -48,6 +55,10 @@ def align_reads(reads_file, reference_file, output_sam, aligner="bwa", threads=1
             reference_file,
             *reads_files,
         ]
+        if read_group is not None:
+            if not isinstance(read_group, str) or not read_group.startswith("@RG\\t"):
+                raise ValueError("read_group must be an @RG header line.")
+            command[2:2] = ["-R", read_group]
     elif aligner == "minimap2":
         executable = require_executable("minimap2")
         command = [
@@ -62,6 +73,14 @@ def align_reads(reads_file, reference_file, output_sam, aligner="bwa", threads=1
         raise ValueError("aligner must be 'bwa' or 'minimap2'.")
 
     return run_command(command, stdout_path=output_sam)
+
+
+def index_reference(reference_file):
+    """Create a BWA index for a reference FASTA."""
+    reference_file = require_file(reference_file, "Reference")
+    executable = require_executable("bwa")
+    run_command([executable, "index", reference_file])
+    return reference_file
 
 
 def convert_sam_to_bam(sam_file, output_bam=None):

@@ -1,0 +1,8 @@
+services:
+  bioseq:
+    build:
+      context: .
+      dockerfile: containers/Dockerfile
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
