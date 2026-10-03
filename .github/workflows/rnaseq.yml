@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  airway-differential-expression:
+  validate-nextflow:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -23,30 +23,63 @@ jobs:
       - name: Build RNA-seq container
         run: docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
 
-      - name: Run differential-expression workflow
+      - name: Smoke-test tximport and DESeq2 analysis
+        run: |
+          docker run --rm \
+            --mount "type=bind,source=$PWD,target=/workspace" \
+            -w /workspace \
+            bioseq-rnaseq:latest \
+            Rscript tests/rnaseq_smoke.R analysis/rnaseq_airway_deseq2.R
+
+      - name: Validate RNA-seq workflow and sample sheet
+        run: |
+          test -s analysis/airway_samples.tsv
+          nextflow run main.nf -preview -profile docker
+
+  raw-read-differential-expression:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Nextflow
+        uses: nf-core/setup-nextflow@v1
+        with:
+          version: "24.10.5"
+
+      - name: Build RNA-seq container
+        run: docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
+
+      - name: Run raw-read differential-expression workflow
         run: |
           nextflow run main.nf \
             -profile docker \
-            --outdir "${RUNNER_TEMP}/bioseq-rnaseq-results" \
+            --outdir "${RUNNER_TEMP}/bioseq-rnaseq-raw-results" \
+            --threads 2 \
             -with-report "${RUNNER_TEMP}/nextflow-report.html" \
             -with-trace "${RUNNER_TEMP}/nextflow-trace.txt"
 
       - name: Verify analysis reports
         run: |
           set -euo pipefail
-          results="${RUNNER_TEMP}/bioseq-rnaseq-results"
-          test -s "${results}/deseq2_results.csv"
-          test -s "${results}/analysis_summary.txt"
-          test -s "${results}/ma_plot.png"
-          test -s "${results}/volcano_plot.png"
-          test -s "${results}/session_info.txt"
-          grep -q "^Conclusion:" "${results}/analysis_summary.txt"
+          results="${RUNNER_TEMP}/bioseq-rnaseq-raw-results"
+          test -s "${results}/qc/N61311_untrt.fastp.html"
+          test -s "${results}/quant/N61311_untrt.quant.sf"
+          test -s "${results}/results/deseq2_results.csv"
+          test -s "${results}/results/analysis_summary.txt"
+          test -s "${results}/results/ma_plot.png"
+          test -s "${results}/results/volcano_plot.png"
+          test -s "${results}/results/pca_plot.png"
+          test -s "${results}/results/session_info.txt"
+          grep -q "^Conclusion:" "${results}/results/analysis_summary.txt"
 
       - name: Save analysis outputs
         uses: actions/upload-artifact@v4
         with:
-          name: airway-rnaseq-results
+          name: airway-raw-rnaseq-results
           path: |
-            ${{ runner.temp }}/bioseq-rnaseq-results/
+            ${{ runner.temp }}/bioseq-rnaseq-raw-results/
             ${{ runner.temp }}/nextflow-report.html
             ${{ runner.temp }}/nextflow-trace.txt

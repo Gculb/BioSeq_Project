@@ -7,8 +7,8 @@ paths:
 2. An opt-in HG002 benchmark that prepares a known sample, aligns reads, calls
    small variants, and measures calls/performance against a direct-tool
    baseline and GIAB truth.
-3. A Nextflow workflow that runs a paired-donor RNA-seq differential-expression
-   analysis in R/DESeq2 from a public processed count matrix.
+3. Nextflow workflows for the staged HG002 variant benchmark and a raw-read
+   paired-donor RNA-seq differential-expression analysis in R/DESeq2.
 
 The CLI does not implicitly download data, align reads, or call variants.
 
@@ -56,8 +56,9 @@ failure modes.
 | `bioseq.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
 | `bioseq.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
 | `containers/`, `compose.yaml` | Provide a Docker environment with pinned benchmark tool versions. |
-| `main.nf`, `nextflow.config`, `analysis/rnaseq_airway_deseq2.R` | Run the public airway RNA-seq DESeq2 analysis with Nextflow and a Docker profile. |
-| `hg002.nf` | Prepare public GIAB inputs and execute the existing HG002 baseline-versus-wrapper benchmark as a Nextflow DAG. |
+| `main.nf`, `analysis/airway_samples.tsv`, `analysis/rnaseq_airway_deseq2.R` | Download public paired FASTQs, run fastp and Salmon, and analyze gene-level differential expression with tximport/DESeq2. |
+| `hg002.nf` | Prepare the public GIAB inputs and run each alignment, processing, calling, QC, and truth-scoring stage as a separate Nextflow task. |
+| `nextflow.config` | Configure the Docker profile used by the Nextflow workflows. |
 
 ## Workflow details
 
@@ -111,28 +112,27 @@ extraction. This keeps mates together without searching for mates across the
 whole remote BAM. The truth VCF/confident BED are evaluation resources; the
 Broad Mills/1000G known-sites VCF is a distinct resource used during BQSR.
 
-Each workflow runs reference indexing/metadata preparation, FASTQ QC,
-BWA-MEM alignment, SAM-to-BAM conversion, name sorting, fixmate, coordinate
-sorting, duplicate marking, indexing, alignment QC, BaseRecalibrator,
-ApplyBQSR, recalibrated BAM indexing, GATK HaplotypeCaller, and VCF QC.
-`full_benchmark` executes the direct baseline and wrapper candidate with the
-same tool versions and arguments. RTG then scores each call set against truth
-inside the confident regions.
+`hg002.nf` models reference setup, paired FASTQ QC, BWA-MEM alignment,
+SAM-to-BAM conversion, name sorting, fixmate, coordinate sorting, duplicate
+marking/indexing, BaseRecalibrator, ApplyBQSR, HaplotypeCaller, VCF QC, and RTG
+`vcfeval` truth scoring as distinct Nextflow processes. This DAG uses direct
+CLI invocations so Nextflow owns stage scheduling and reports. The separate
+`bioseq.full_benchmark` command remains available to compare the wrappers with
+direct tool invocations. Public input preparation is uncached and currently
+limited to chr20.
 
-`hg002.nf` provides a Nextflow entry point for the same pilot: one process
-prepares the regional public inputs, then a dependent process runs
-`bioseq.full_benchmark` in the pinned BioSeq container. That command retains
-the existing per-stage baseline and wrapper execution and truth-set evaluation.
-The preparation process is not cached because it reads mutable remote resources.
+### Raw-read airway RNA-seq analysis
 
-### Nextflow airway RNA-seq analysis
-
-`main.nf` runs `analysis/rnaseq_airway_deseq2.R` in the
-`bioseq-rnaseq:latest` container. The analysis uses the Bioconductor airway
-processed count matrix, fits `~ cell + dex`, and writes DESeq2 results,
-summary, plots, and R session information. The `docker` profile is used locally
-and by the GitHub-hosted CI workflow. It is a separate biological analysis; it
-does not change or reuse the HG002 variant-calling results.
+`main.nf` obtains paired raw reads from ENA for the eight
+dexamethasone/untreated libraries listed in `analysis/airway_samples.tsv`.
+Separate processes download reads, run fastp, build a Salmon index from Ensembl
+112 GRCh38 cDNA, and quantify each library. The R analysis imports Salmon
+quantifications with a transcript-to-gene map and tximport, then fits
+`~ cell + dex` in DESeq2. It reports gene-level results and MA, volcano, and
+PCA plots. This is a reanalysis of a public study (GSE52778), not a novel cohort
+or independent validation. The ordinary Actions job only previews the DAG;
+the full read download is manually dispatched and produces a downloadable
+artifact.
 
 ## Data and report layout
 
@@ -163,13 +163,20 @@ pins Python, Biopython, psutil, BWA, samtools, bcftools, GATK, and RTG Tools in
 - The full benchmark requires Docker/Compose to use the pinned toolchain and
   internet access for public input preparation.
 - The RNA-seq workflow requires Java 17, Nextflow 24.10.5, and Docker; its image
-  installs R 4.4.3, Bioconductor 3.20, airway, and DESeq2.
+  installs R 4.4.3, Bioconductor 3.20, fastp, Salmon, DESeq2, and tximport.
 
 Reproducibility depends on recording immutable input checksums, sample and
 reference assembly, genomic region, data-resource versions, tools and
 parameters, filtering/evaluation regions, and environment. The full benchmark
 records many of these values. Timing and memory are machine-dependent; RSS is
 sampled every 50 ms and sums process RSS, which can double-count shared memory.
+
+The current hosted execution uses a single GitHub Linux runner. Scaling the
+HG002 workflow to whole genomes requires full-genome inputs, interval scatter
+and gather around variant calling, and substantially larger scratch storage
+and compute allocations. Scaling to cohorts also requires per-sample channels
+and GVCF joint genotyping; the current regional single-sample path does not
+implement either capability.
 
 ## Benchmark interpretation and limits
 

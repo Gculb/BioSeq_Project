@@ -7,11 +7,13 @@ RUN apt-get update \
         liblzma-dev \
         libssl-dev \
         libxml2-dev \
+        fastp \
+        salmon \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/* \
     && R -e 'install.packages("BiocManager", repos = "https://cloud.r-project.org")' \
     && R -e 'BiocManager::install(version = "3.20", ask = FALSE, update = FALSE)' \
-    && R -e 'BiocManager::install(c("airway", "DESeq2"), ask = FALSE, update = FALSE)' \
-    && Rscript -e 'stopifnot(requireNamespace("airway", quietly = TRUE), requireNamespace("DESeq2", quietly = TRUE))'
+    && R -e 'BiocManager::install(c("DESeq2", "tximport"), ask = FALSE, update = FALSE)' \
+    && Rscript -e 'stopifnot(requireNamespace("DESeq2", quietly = TRUE), requireNamespace("tximport", quietly = TRUE))'
 
 WORKDIR /pipeline

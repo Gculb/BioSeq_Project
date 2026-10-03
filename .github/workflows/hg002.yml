@@ -35,11 +35,10 @@ jobs:
       - name: Verify benchmark outputs
         run: |
           set -euo pipefail
-          results="${RUNNER_TEMP}/bioseq-hg002-results/comparison"
-          test -s "${results}/comparison.json"
-          test -s "${results}/baseline/workflow.json"
-          test -s "${results}/bioseq/workflow.json"
-          test -s "${results}/truth_evaluation/benchmark.json"
+          results="${RUNNER_TEMP}/bioseq-hg002-results"
+          test -s "${results}/variants/calls.vcf.gz"
+          test -s "${results}/truth_evaluation/rtg_eval/summary.txt"
+          test -s "${results}/qc/vcf_qc/calls_report.json"
 
       - name: Save benchmark outputs
         uses: actions/upload-artifact@v4

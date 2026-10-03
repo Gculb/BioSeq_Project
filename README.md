@@ -1,7 +1,10 @@
-# BioSeq Starter
+# BioSeq
 
-A bioinformatics project for sequence analysis, benchmarking, and biological
-interpretation.
+[![BioSeq CLI](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml)
+[![RNA-seq pipeline](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml)
+[![HG002 pipeline](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml)
+
+Reproducible genomics workflows with Python, R, Nextflow, and containers.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for component and data-flow diagrams,
 and [DESIGN_NOTES.md](./DESIGN_NOTES.md) for answers to the biological and
@@ -36,16 +39,16 @@ then invokes `bioseq.pipeline` on the example FASTA and FASTQ files and checks
 that each run produced JSON and text reports. It does not download external
 datasets or run the resource-intensive GIAB benchmark.
 
-The separate `BioSeq RNA-seq` workflow runs the Nextflow analysis on a
-GitHub-hosted Linux runner using Docker. On success, it saves the differential
-expression tables, summary, plots, and Nextflow execution report as a workflow
-artifact.
+The `BioSeq RNA-seq` workflow validates Nextflow on pushes and pull requests.
+Its full raw-read analysis is manually dispatched because it downloads several
+paired-end public sequencing runs. The completed analysis and Nextflow reports
+are saved as a workflow artifact.
 
 The `BioSeq HG002 Nextflow benchmark` workflow can be started manually from
-GitHub Actions. It runs the existing regional pilot on a hosted Linux runner;
-input preparation is network- and compute-intensive, so it is not part of every
-push or pull-request check. Its results and Nextflow execution reports are
-saved as the `hg002-nextflow-results` artifact.
+GitHub Actions. It runs the regional pilot on a hosted Linux runner; input
+preparation is network- and compute-intensive, so it is not part of every push
+or pull-request check. Its results and Nextflow execution reports are saved as
+the `hg002-nextflow-results` artifact.
 
 ## End-to-end HG002 germline pilot
 
@@ -72,9 +75,12 @@ and the whole BAM is not intentionally downloaded, though network range
 requests may transfer substantial data. Prepared inputs are ignored by Git and
 stored locally under `data/benchmark/`.
 
-The same pilot can be run as a Nextflow DAG. Build the existing pinned tool
-image, then run this from Linux, macOS, or WSL2 with Java 17, Nextflow 24.10.5,
-and Docker available:
+The same pilot can be run as a Nextflow DAG. Its steps are separate tasks for
+input preparation, reference indexing, paired-read QC, BWA-MEM alignment,
+SAM/BAM conversion, name sorting, mate fixing, coordinate sorting, duplicate
+marking and indexing, BQSR, HaplotypeCaller, VCF QC, and RTG truth evaluation.
+Build the pinned tool image, then run from Linux, macOS, or WSL2 with Java 17,
+Nextflow 24.10.5, and Docker available:
 
 ```bash
 docker build -f containers/Dockerfile -t bioseq:latest .
@@ -85,11 +91,18 @@ nextflow run hg002.nf \
   --outdir results/HG002_nextflow
 ```
 
-Nextflow prepares the GIAB inputs and passes them to the existing BioSeq and
-direct-tool comparison; the comparison report is published under the selected
+Nextflow publishes QC, variant calls, and RTG summaries under the selected
 output directory. The preparation step is deliberately not cached, so each
-run retrieves current public resources. The detailed process-level variant
-calling remains in the existing tested Python workflow.
+run retrieves current public resources. This Nextflow DAG executes the direct
+tool stages explicitly; the Python `bioseq.full_benchmark` command remains the
+separate wrapper-versus-direct parity benchmark.
+
+To rerun the DAG using an already prepared local input directory instead of
+downloading/preparing the public data again, add:
+
+```bash
+--prepared-dir data/benchmark/giab_hg002_chr20
+```
 
 On Windows, start Docker Desktop with its Linux engine first. Build the pinned
 tool environment:
@@ -188,18 +201,24 @@ rather than GVCF joint genotyping and does not run VQSR), or clinical
 validation. BLAST and downloading remain separate utilities; BLAST is not a
 read-alignment or variant-calling stage.
 
-## Nextflow RNA-seq differential-expression analysis
+## Raw-read RNA-seq differential-expression analysis
 
-The second end-to-end analysis uses the public airway smooth-muscle RNA-seq
-count data distributed by Bioconductor's
-[airway package](https://bioconductor.org/packages/airway/) (GEO
-[GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778)).
-It compares dexamethasone-treated and untreated samples with DESeq2, including
-donor cell line in the model (`~ cell + dex`) to account for the paired design.
-The R script reports adjusted-p-value-ranked gene-level results, a concise
-dataset-specific conclusion, MA and volcano plots, and R session information.
-This starts from the package's processed count matrix; it does not reprocess
-raw FASTQ files.
+The RNA-seq workflow reanalyzes paired raw FASTQ files from the public airway
+smooth-muscle study (GEO
+[GSE52778](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52778);
+SRA study [SRP033351](https://www.ncbi.nlm.nih.gov/sra?term=SRP033351)).
+This is a well-known study, but the workflow starts from the original reads,
+not the Bioconductor tutorial count matrix. It retrieves the eight untreated
+and dexamethasone samples from ENA, runs fastp, quantifies against the
+Ensembl 112 GRCh38 transcriptome with Salmon, imports gene-level estimates
+with tximport, and performs paired-donor DESeq2 (`~ cell + dex`) in R.
+
+The sample-to-run and treatment mapping is recorded in
+[analysis/airway_samples.tsv](./analysis/airway_samples.tsv). Outputs include
+per-sample fastp reports, Salmon quantifications, adjusted-p-value-ranked
+gene-level results, a concise dataset-specific conclusion, MA/volcano/PCA
+plots, and R session information. The analysis is exploratory, uses four
+donors from one study, and is not independent validation or a clinical claim.
 
 Build the analysis container from the repository root:
 
@@ -208,21 +227,42 @@ docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
 ```
 
 Install Java 17 and Nextflow 24.10.5, then run from Linux, macOS, or WSL2 with
-Docker available:
+Docker available. This downloads several gigabytes of public reads and takes
+longer than a local smoke test; allow ample free disk for the FASTQs,
+trimmed reads, and Salmon index. Per-sample download, trimming, and
+quantification are limited to one active task to avoid bursting memory and
+network use:
 
 ```bash
-nextflow run main.nf -profile docker --outdir results/rnaseq_airway
+nextflow run main.nf \
+  -profile docker \
+  --samplesheet analysis/airway_samples.tsv \
+  --threads 2 \
+  --outdir results/rnaseq_airway_raw
 ```
 
-The `docker` profile is configured in `nextflow.config`. The GitHub Actions
-workflow runs this analysis on a hosted Linux runner and retains its reports as
-an artifact, providing a reproducible run outside a developer's laptop.
-Inspect the workflow run and download its `airway-rnaseq-results` artifact for
-the actual result files. Differential expression in this small dataset is
-exploratory and dataset-specific; it is not an independent validation cohort
-or a general claim about clinical response. For stronger generalization,
-confirm findings with a separately collected cohort and a pre-specified
-analysis.
+The `docker` profile is configured in `nextflow.config`; the image contains
+fastp, Salmon, R, DESeq2, and tximport. On GitHub, use **Actions → BioSeq
+RNA-seq → Run workflow** to run the raw-data analysis on a hosted Linux runner,
+then download its `airway-raw-rnaseq-results` artifact. The ordinary CI job
+only validates workflow syntax to avoid repeatedly downloading large input
+files on every push.
+
+## Scope and scaling
+
+The committed HG002 execution is a one-megabase chr20 pilot using two threads;
+the RNA-seq example is eight libraries from four donors. These are reproducible
+demonstrations, not claims of whole-genome or multi-cohort throughput.
+
+For whole-genome HG002, use full-genome reads and reference inputs rather than
+the region-extracted pilot, provision scratch space for large BAM intermediates,
+and scatter HaplotypeCaller over non-overlapping intervals before gathering
+calls. For multiple individuals, make sample a first-class channel key, align
+each sample independently, size CPU/memory/storage per task for the execution
+backend, and use GVCF joint genotyping rather than treating samples as one
+callset. A real cloud deployment should add a cloud execution profile and
+object-store work/results paths; the current hosted-runner examples demonstrate
+execution away from a laptop, not a managed cloud deployment.
 
 ## Compare variant calls against a truth set
 
