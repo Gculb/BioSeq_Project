@@ -147,14 +147,22 @@ process MULTIQC {
 
     output:
     path "multiqc_report.html"
+    path "multiqc_general_stats.txt"
 
     script:
     """
     mkdir -p multiqc_input
     cp -L *.fastp.json multiqc_input/
-    cp -LR *_salmon multiqc_input/
-    multiqc multiqc_input --outdir multiqc_output --filename multiqc_report.html --force --no-data-dir
+    printf '%s\\n' 'use_filename_as_sample_name:' '  - fastp' > multiqc_config.yaml
+    mkdir -p multiqc_input/salmon
+    for salmon_report in *_salmon; do
+      sample=\${salmon_report%_salmon}
+      mkdir -p "multiqc_input/salmon/\$sample"
+      cp -LR "\$salmon_report/aux_info" "multiqc_input/salmon/\$sample/"
+    done
+    multiqc multiqc_input --config multiqc_config.yaml --outdir multiqc_output --filename multiqc_report.html --force
     cp multiqc_output/multiqc_report.html .
+    cp multiqc_output/multiqc_report_data/multiqc_general_stats.txt .
     """
 }
 
@@ -212,10 +220,10 @@ workflow {
     quant_results = SALMON_QUANT.out.quant
         .map { meta, quant_file, salmon_report -> tuple(meta, quant_file) }
         .collect(flat: false)
-        .map { results ->
+        .map { rows ->
             tuple(
-                results.collect { meta, quant_file -> meta },
-                results.collect { meta, quant_file -> quant_file }
+                rows.collect { row -> row[0] },
+                rows.collect { row -> row[1] }
             )
         }
     DESEQ2(

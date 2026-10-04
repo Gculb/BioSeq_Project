@@ -10,6 +10,35 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for component and data-flow diagrams,
 and [DESIGN_NOTES.md](./DESIGN_NOTES.md) for answers to the biological and
 software questions behind the project.
 
+## The problem and what the project demonstrates
+
+Genomics results depend on a chain of tools, inputs, parameters, and runtime
+environments. When those steps live in disconnected scripts, it is difficult
+to reproduce a result, see where a sample failed, or tell whether a wrapper
+changed the behavior of the underlying bioinformatics tools. BioSeq addresses
+that workflow problem with containerized, stage-based pipelines and explicit
+quality-control and result artifacts. It is a reproducibility and workflow
+engineering project; it does not claim to introduce a new variant caller or
+improve the accuracy of established tools.
+
+Two pilots make that goal measurable:
+
+| Pilot | Question | Observed result |
+| --- | --- | --- |
+| HG002 regional variant calling | Do BioSeq's wrappers preserve the results of the same direct BWA, samtools, and GATK commands? | On one 1 Mb chr20 region, both paths had identical GIAB truth-set scores: precision, recall, and F1 were each 0.9962 (1,582 TP, 6 FP, 6 FN). The wrapper run took 302 s vs 328 s and used 561.6 vs 584.5 MiB peak sampled RSS in this single run. |
+| Airway smooth-muscle RNA-seq | Can public paired raw reads be taken through QC and quantification to a donor-adjusted biological comparison? | All eight libraries completed fastp and Salmon processing; Salmon mapping rates were 92.3–93.9%. In the DESeq2 model (`~ cell + dex`), no genes met BH-adjusted `p < 0.05` across four donor cell lines. With only four donors, this is inconclusive—not evidence of no treatment effect. |
+
+These are bounded demonstrations, not general performance or biological
+claims. The HG002 runtime and memory differences come from a single run and
+need repeated measurements to establish a reliable performance difference.
+The RNA-seq analysis is an exploratory reanalysis of one study, not an
+independent cohort or a machine-learning model; its principal result is that
+this small paired dataset did not yield statistically significant genes at
+the selected threshold. See the [HG002 results](#hg002-chr20-pilot-results),
+[RNA-seq analysis](#raw-read-rna-seq-differential-expression-analysis), and
+[pipeline analysis report](./PIPELINE_ANALYSIS.md) for methods, figures, and
+limitations.
+
 ## Current version
 
 The project includes FASTA/FASTQ validation and analysis, FASTQ quality control,
@@ -264,6 +293,7 @@ summaries across samples. The same artifact includes the key DESeq2 outputs:
 | Artifact path | What it shows |
 | --- | --- |
 | `results/analysis_summary.txt` | Dataset-specific conclusion and count of significant genes. |
+| `multiqc/multiqc_general_stats.txt` | Machine-readable fastp and Salmon QC summary with one row per sample. |
 | `results/ma_plot.png` | Estimated log fold changes across expression levels. |
 | `results/volcano_plot.png` | Effect sizes against adjusted p-values. |
 | `results/pca_plot.png` | Sample clustering by treatment and donor cell line. |

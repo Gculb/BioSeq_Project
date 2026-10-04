@@ -68,6 +68,7 @@ jobs:
           test -s "${results}/qc/N61311_untrt.fastp.html"
           test -s "${results}/quant/N61311_untrt.quant.sf"
           test -s "${results}/multiqc/multiqc_report.html"
+          test -s "${results}/multiqc/multiqc_general_stats.txt"
           test -s "${results}/results/deseq2_results.csv"
           test -s "${results}/results/analysis_summary.txt"
           test -s "${results}/results/ma_plot.png"
@@ -77,6 +78,14 @@ jobs:
           grep -q "^Conclusion:" "${results}/results/analysis_summary.txt"
           grep -qi "fastp" "${results}/multiqc/multiqc_report.html"
           grep -qi "salmon" "${results}/multiqc/multiqc_report.html"
+          test "$(wc -l < "${results}/multiqc/multiqc_general_stats.txt")" -eq 9
+          for sample in \
+            N61311_untrt N61311_trt \
+            N052611_untrt N052611_trt \
+            N080611_untrt N080611_trt \
+            N061011_untrt N061011_trt; do
+            grep -Fq "${sample}" "${results}/multiqc/multiqc_general_stats.txt"
+          done
 
       - name: Save analysis outputs
         uses: actions/upload-artifact@v4
