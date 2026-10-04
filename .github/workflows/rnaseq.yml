@@ -67,6 +67,7 @@ jobs:
           results="${RUNNER_TEMP}/bioseq-rnaseq-raw-results"
           test -s "${results}/qc/N61311_untrt.fastp.html"
           test -s "${results}/quant/N61311_untrt.quant.sf"
+          test -s "${results}/multiqc/multiqc_report.html"
           test -s "${results}/results/deseq2_results.csv"
           test -s "${results}/results/analysis_summary.txt"
           test -s "${results}/results/ma_plot.png"
@@ -74,6 +75,8 @@ jobs:
           test -s "${results}/results/pca_plot.png"
           test -s "${results}/results/session_info.txt"
           grep -q "^Conclusion:" "${results}/results/analysis_summary.txt"
+          grep -qi "fastp" "${results}/multiqc/multiqc_report.html"
+          grep -qi "salmon" "${results}/multiqc/multiqc_report.html"
 
       - name: Save analysis outputs
         uses: actions/upload-artifact@v4

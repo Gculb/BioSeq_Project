@@ -56,7 +56,7 @@ failure modes.
 | `bioseq.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
 | `bioseq.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
 | `containers/`, `compose.yaml` | Provide a Docker environment with pinned benchmark tool versions. |
-| `main.nf`, `analysis/airway_samples.tsv`, `analysis/rnaseq_airway_deseq2.R` | Download public paired FASTQs, run fastp and Salmon, and analyze gene-level differential expression with tximport/DESeq2. |
+| `main.nf`, `analysis/airway_samples.tsv`, `analysis/rnaseq_airway_deseq2.R` | Download public paired FASTQs, run fastp and Salmon, aggregate QC/quantification summaries with MultiQC, and analyze gene-level differential expression with tximport/DESeq2. |
 | `hg002.nf` | Prepare the public GIAB inputs and run each alignment, processing, calling, QC, and truth-scoring stage as a separate Nextflow task. |
 | `nextflow.config` | Configure the Docker profile used by the Nextflow workflows. |
 
@@ -129,10 +129,11 @@ Separate processes download reads, run fastp, build a Salmon index from Ensembl
 112 GRCh38 cDNA, and quantify each library. The R analysis imports Salmon
 quantifications with a transcript-to-gene map and tximport, then fits
 `~ cell + dex` in DESeq2. It reports gene-level results and MA, volcano, and
-PCA plots. This is a reanalysis of a public study (GSE52778), not a novel cohort
-or independent validation. The ordinary Actions job only previews the DAG;
-the full read download is manually dispatched and produces a downloadable
-artifact.
+PCA plots. A MultiQC task combines fastp JSON and Salmon auxiliary summary
+metadata into an HTML report. This is a reanalysis of a public study
+(GSE52778), not a novel cohort or independent validation. The ordinary Actions
+job only previews the DAG; the full read download is manually dispatched and
+produces a downloadable artifact with the QC and analysis outputs.
 
 ## Data and report layout
 

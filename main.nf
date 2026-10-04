@@ -108,7 +108,10 @@ process SALMON_QUANT {
     tuple val(meta), path(read1), path(read2), path(salmon_index)
 
     output:
-    tuple val(meta), path("${meta.sample}.quant.sf")
+    tuple val(meta),
+          path("${meta.sample}.quant.sf"),
+          path("${meta.sample}_salmon"),
+          emit: quant
 
     script:
     """
@@ -123,6 +126,35 @@ process SALMON_QUANT {
       -p ${task.cpus} \\
       -o quant
     cp quant/quant.sf ${meta.sample}.quant.sf
+    mkdir -p ${meta.sample}_salmon/aux_info
+    cp quant/aux_info/meta_info.json ${meta.sample}_salmon/aux_info/
+    if [ -f quant/aux_info/lib_format_counts.json ]; then
+      cp quant/aux_info/lib_format_counts.json ${meta.sample}_salmon/aux_info/
+    fi
+    if [ -f quant/aux_info/flenDist.txt ]; then
+      cp quant/aux_info/flenDist.txt ${meta.sample}_salmon/aux_info/
+    fi
+    """
+}
+
+process MULTIQC {
+    container "multiqc/multiqc:v1.27@sha256:b4c30167e87ecb120925792c20c4c98d06076dde5f6ba9af48dda792fa549225"
+    publishDir "${params.outdir}/multiqc", mode: "copy"
+
+    input:
+    path fastp_reports
+    path salmon_reports
+
+    output:
+    path "multiqc_report.html"
+
+    script:
+    """
+    mkdir -p multiqc_input
+    cp -L *.fastp.json multiqc_input/
+    cp -LR *_salmon multiqc_input/
+    multiqc multiqc_input --outdir multiqc_output --filename multiqc_report.html --force --no-data-dir
+    cp multiqc_output/multiqc_report.html .
     """
 }
 
@@ -143,7 +175,8 @@ process DESEQ2 {
     path "pca_plot.png"
     path "session_info.txt"
     script:
-    def sample_manifest = sample_meta.collectWithIndex { meta, index ->
+    def sample_manifest = (0..<sample_meta.size()).collect { index ->
+        def meta = sample_meta[index]
         "${meta.sample}\t${meta.cell}\t${meta.dex}\t${quant_files[index]}"
     }.join("\n")
     """
@@ -169,10 +202,16 @@ workflow {
     salmon_index = SALMON_INDEX.out.index
     tx2gene = SALMON_INDEX.out.tx2gene
     SALMON_QUANT(FASTP.out.trimmed.combine(salmon_index))
+    MULTIQC(
+        FASTP.out.json.collect(),
+        SALMON_QUANT.out.quant
+            .map { meta, quant_file, salmon_report -> salmon_report }
+            .collect()
+    )
 
-    quant_results = SALMON_QUANT.out
-        .map { meta, quant_file -> tuple(meta, quant_file) }
-        .collect()
+    quant_results = SALMON_QUANT.out.quant
+        .map { meta, quant_file, salmon_report -> tuple(meta, quant_file) }
+        .collect(flat: false)
         .map { results ->
             tuple(
                 results.collect { meta, quant_file -> meta },

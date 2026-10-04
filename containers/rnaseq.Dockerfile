@@ -7,6 +7,7 @@ RUN apt-get update \
         liblzma-dev \
         libssl-dev \
         libxml2-dev \
+        curl \
         fastp \
         salmon \
         zlib1g-dev \

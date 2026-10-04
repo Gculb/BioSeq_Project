@@ -37,7 +37,7 @@ rownames(sample_data) <- sample_data$sample
 sample_data$cell <- factor(sample_data$cell)
 sample_data$dex <- relevel(factor(sample_data$dex), ref = "untrt")
 files <- setNames(quant_files, sample_data$sample)
-txi <- tximport(files, type = "salmon", tx2gene = tx2gene)
+txi <- tximport(files, type = "salmon", tx2gene = tx2gene, ignoreTxVersion = TRUE)
 
 dds <- DESeqDataSetFromTximport(txi, colData = sample_data, design = ~ cell + dex)
 dds <- dds[rowSums(counts(dds)) >= 10, ]
@@ -55,6 +55,25 @@ write.csv(result_table, "deseq2_results.csv", row.names = FALSE, na = "")
 significant <- result_table[!is.na(result_table$padj) & result_table$padj < 0.05, ]
 upregulated <- sum(significant$log2FoldChange > 0)
 downregulated <- sum(significant$log2FoldChange < 0)
+conclusion <- if (nrow(significant) > 0) {
+  sprintf(
+    paste(
+      "Conclusion: dexamethasone treatment is associated with differential",
+      "gene expression in this airway smooth-muscle dataset after accounting",
+      "for donor cell line (%d genes at adjusted p-value < 0.05). This",
+      "dataset-specific reanalysis is exploratory and is not independent",
+      "validation or evidence of a general treatment effect."
+    ),
+    nrow(significant)
+  )
+} else {
+  paste(
+    "Conclusion: no genes met the adjusted p-value < 0.05 threshold for the",
+    "dexamethasone effect after accounting for donor cell line. With only four",
+    "donors, this result does not establish that treatment has no biological",
+    "effect; it is a dataset-specific, exploratory reanalysis."
+  )
+}
 summary_lines <- c(
   "Dataset: raw paired-end RNA-seq for airway smooth muscle cells (GEO GSE52778)",
   "Comparison: dexamethasone-treated (trt) vs untreated (untrt)",
@@ -64,17 +83,12 @@ summary_lines <- c(
   "Significance threshold: Benjamini-Hochberg adjusted p-value < 0.05",
   sprintf("Significant genes: %d (%d higher with dex, %d lower with dex)",
           nrow(significant), upregulated, downregulated),
-  paste(
-    "Conclusion: dexamethasone treatment is associated with differential",
-    "gene expression in this airway smooth-muscle dataset after accounting",
-    "for donor cell line. This dataset-specific reanalysis is exploratory and",
-    "is not independent validation or evidence of a general treatment effect."
-  )
+  conclusion
 )
 writeLines(summary_lines, "analysis_summary.txt")
 
 png("ma_plot.png", width = 1200, height = 900, res = 150)
-plotMA(result, ylim = c(-5, 5), main = "Dexamethasone vs untreated")
+plotMA(result, alpha = 0.05, ylim = c(-5, 5), main = "Dexamethasone vs untreated")
 dev.off()
 
 adjusted_p <- pmax(result_table$padj, .Machine$double.xmin, na.rm = FALSE)
@@ -89,14 +103,31 @@ plot(
   col = ifelse(!is.na(result_table$padj) & result_table$padj < 0.05, "firebrick", "grey40"),
   xlab = "Log2 fold change (treated / untreated)",
   ylab = "-Log10 adjusted p-value",
-  main = "Airway RNA-seq differential expression"
+  main = "Airway RNA-seq differential expression",
+  ylim = c(0, max(volcano_y, -log10(0.05), na.rm = TRUE) * 1.05)
 )
 abline(h = -log10(0.05), lty = 2)
 dev.off()
 
-pca <- plotPCA(
-  varianceStabilizingTransformation(dds, blind = FALSE),
-  intgroup = c("dex", "cell")
+vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+pca_data <- plotPCA(
+  vsd,
+  intgroup = c("dex", "cell"),
+  returnData = TRUE
 )
+percent_var <- round(100 * attr(pca_data, "percentVar"))
+pca <- ggplot(
+  pca_data,
+  aes(x = PC1, y = PC2, color = dex, shape = cell)
+) +
+  geom_point(size = 4) +
+  xlab(sprintf("PC1: %d%% variance", percent_var[[1]])) +
+  ylab(sprintf("PC2: %d%% variance", percent_var[[2]])) +
+  labs(
+    title = "Airway RNA-seq sample PCA",
+    color = "Treatment",
+    shape = "Donor cell line"
+  ) +
+  theme_bw()
 ggsave("pca_plot.png", pca, width = 8, height = 6, dpi = 150)
 writeLines(capture.output(sessionInfo()), "session_info.txt")

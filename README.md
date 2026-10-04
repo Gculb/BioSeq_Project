@@ -191,6 +191,14 @@ files. The reported coverage is alignment coverage across the requested
 interval, not a statement that every base is callable or belongs to the GIAB
 confident regions.
 
+The plots below summarize this single regional comparison; the separate
+[pipeline analysis report](./PIPELINE_ANALYSIS.md) explains the results and
+their limitations.
+
+![HG002 baseline and BioSeq wrapper precision, sensitivity, and F1 parity](./docs/images/hg002-accuracy-parity.svg)
+
+![HG002 baseline and BioSeq wrapper runtime and sampled peak memory](./docs/images/hg002-runtime-memory.svg)
+
 The combined metrics are saved in
 [`results/HG002_chr20_comparison/comparison.json`](results/HG002_chr20_comparison/comparison.json);
 per-run stage detail is in each implementation's `workflow.json`, and RTG's
@@ -215,10 +223,50 @@ with tximport, and performs paired-donor DESeq2 (`~ cell + dex`) in R.
 
 The sample-to-run and treatment mapping is recorded in
 [analysis/airway_samples.tsv](./analysis/airway_samples.tsv). Outputs include
-per-sample fastp reports, Salmon quantifications, adjusted-p-value-ranked
-gene-level results, a concise dataset-specific conclusion, MA/volcano/PCA
-plots, and R session information. The analysis is exploratory, uses four
-donors from one study, and is not independent validation or a clinical claim.
+per-sample fastp reports, Salmon quantifications, a combined MultiQC report,
+adjusted-p-value-ranked gene-level results, a concise dataset-specific
+conclusion, MA/volcano/PCA plots, and R session information. MultiQC combines
+fastp read-quality metrics with Salmon library/quantification summaries. The
+analysis is exploratory, uses four donors from one study, and is not
+independent validation or a clinical claim.
+
+In this full raw-read run, no genes passed the Benjamini-Hochberg adjusted
+`p < 0.05` threshold after accounting for donor cell line. With only four
+donors, this is inconclusive rather than evidence that dexamethasone has no
+biological effect. The plots below are generated from this run; the separate
+[analysis report](./PIPELINE_ANALYSIS.md) gives the methods and interpretation.
+
+#### Differential-expression visualizations
+
+These plots are generated from the full eight-sample raw-read run and included
+here so the analysis can be inspected without downloading the workflow
+artifact. The [MultiQC report](./docs/reports/airway-multiqc.html) summarizes
+read QC and Salmon quantification across samples.
+
+**PCA of variance-stabilized expression**
+
+![DESeq2 PCA showing airway samples colored by treatment and shaped by donor cell line](./docs/images/airway-pca.png)
+
+**MA plot**
+
+![DESeq2 MA plot for dexamethasone-treated versus untreated samples](./docs/images/airway-ma.png)
+
+**Volcano plot**
+
+![DESeq2 volcano plot of log2 fold change against adjusted p-value](./docs/images/airway-volcano.png)
+
+### Inspecting the results
+
+The manual full-workflow run publishes an `airway-raw-rnaseq-results` artifact.
+Open `multiqc/multiqc_report.html` in a browser to inspect QC and Salmon
+summaries across samples. The same artifact includes the key DESeq2 outputs:
+
+| Artifact path | What it shows |
+| --- | --- |
+| `results/analysis_summary.txt` | Dataset-specific conclusion and count of significant genes. |
+| `results/ma_plot.png` | Estimated log fold changes across expression levels. |
+| `results/volcano_plot.png` | Effect sizes against adjusted p-values. |
+| `results/pca_plot.png` | Sample clustering by treatment and donor cell line. |
 
 Build the analysis container from the repository root:
 
@@ -226,14 +274,24 @@ Build the analysis container from the repository root:
 docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
 ```
 
-Install Java 17 and Nextflow 24.10.5, then run from Linux, macOS, or WSL2 with
-Docker available. This downloads several gigabytes of public reads and takes
-longer than a local smoke test; allow ample free disk for the FASTQs,
-trimmed reads, and Salmon index. Per-sample download, trimming, and
-quantification are limited to one active task to avoid bursting memory and
-network use:
+### Run locally on Windows
+
+Run Nextflow from a WSL2 Linux shell, not from PowerShell. Start Docker Desktop
+with its Linux engine and WSL integration enabled for your Linux distribution.
+Install Java 17 and Nextflow 24.10.5 inside WSL2, then open the repository in
+that shell. The commands below assume the repository is on the Windows C:
+drive; adjust the path if yours differs:
 
 ```bash
+cd "/mnt/c/Users/Gculb/Desktop/BioSeq Project/BioSeq_Project"
+```
+
+The RNA-seq run downloads several gigabytes of public reads and needs
+additional space for trimmed FASTQs and the Salmon index. Run it from the
+repository root:
+
+```bash
+docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
 nextflow run main.nf \
   -profile docker \
   --samplesheet analysis/airway_samples.tsv \
@@ -241,12 +299,44 @@ nextflow run main.nf \
   --outdir results/rnaseq_airway_raw
 ```
 
+When it finishes, view the QC report and DESeq2 plots from WSL2:
+
+```bash
+explorer.exe "$(wslpath -w results/rnaseq_airway_raw/multiqc/multiqc_report.html)"
+explorer.exe "$(wslpath -w results/rnaseq_airway_raw/results)"
+```
+
+The first command opens the combined fastp/Salmon MultiQC report in your
+browser; the second opens the folder containing `analysis_summary.txt` and
+the MA, volcano, and PCA plots. These files only appear after the full
+workflow completes. If Nextflow stops with an error, inspect its terminal
+output before trying again.
+
+The HG002 workflow is a separate, optional variant-calling pilot. To run its
+staged Nextflow DAG locally, build its tool image and use the prepared inputs
+if they are already available:
+
+```bash
+docker build -f containers/Dockerfile -t bioseq:latest .
+nextflow run hg002.nf \
+  -profile docker \
+  --prepared-dir data/benchmark/giab_hg002_chr20 \
+  --interval chr20:10000000-11000000 \
+  --threads 2 \
+  --outdir results/HG002_nextflow
+```
+
+If that prepared-input directory is absent, omit `--prepared-dir` to let the
+workflow retrieve and prepare public inputs. The HG002 DAG produces variant
+and truth-scoring reports, not the RNA-seq MultiQC report or DESeq2 plots.
+
 The `docker` profile is configured in `nextflow.config`; the image contains
-fastp, Salmon, R, DESeq2, and tximport. On GitHub, use **Actions → BioSeq
-RNA-seq → Run workflow** to run the raw-data analysis on a hosted Linux runner,
-then download its `airway-raw-rnaseq-results` artifact. The ordinary CI job
-only validates workflow syntax to avoid repeatedly downloading large input
-files on every push.
+fastp, Salmon, R, DESeq2, and tximport; a pinned MultiQC container generates
+the combined report. On GitHub, use **Actions → BioSeq RNA-seq → Run workflow**
+to run the raw-data analysis on a hosted Linux runner, then download its
+`airway-raw-rnaseq-results` artifact. The ordinary CI job only validates
+workflow syntax to avoid repeatedly downloading large input files on every
+push.
 
 ## Scope and scaling
 
