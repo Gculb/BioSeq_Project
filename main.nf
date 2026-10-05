@@ -18,7 +18,7 @@ process DOWNLOAD_READS {
 
     script:
     """
-    curl --retry 3 --retry-delay 5 -fsSL \\
+    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL \\
       'https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${run}&result=read_run&fields=run_accession,fastq_ftp&format=tsv' \\
       -o run_info.tsv
     urls=\$(awk -F '\\t' 'NR == 2 { print \$2 }' run_info.tsv | tr ';' '\\n')
@@ -28,8 +28,8 @@ process DOWNLOAD_READS {
       echo "ENA did not provide paired FASTQ files for ${run}" >&2
       exit 1
     fi
-    curl --retry 3 --retry-delay 5 -fsSL "https://\$read1" -o read_1.fastq.gz
-    curl --retry 3 --retry-delay 5 -fsSL "https://\$read2" -o read_2.fastq.gz
+    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL "https://\$read1" -o read_1.fastq.gz
+    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL "https://\$read2" -o read_2.fastq.gz
     gzip -t read_1.fastq.gz
     gzip -t read_2.fastq.gz
     """
@@ -77,9 +77,9 @@ process SALMON_INDEX {
     """
     base='https://ftp.ensembl.org/pub/release-${params.ensembl_release}/fasta/homo_sapiens/cdna'
     annotation='https://ftp.ensembl.org/pub/release-${params.ensembl_release}/gtf/homo_sapiens'
-    curl --retry 3 --retry-delay 5 -fsSL \\
+    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL \\
       "\${base}/Homo_sapiens.GRCh38.cdna.all.fa.gz" -o transcripts.fa.gz
-    curl --retry 3 --retry-delay 5 -fsSL \\
+    curl --retry 10 --retry-delay 10 --retry-max-time 600 -fsSL \\
       "\${annotation}/Homo_sapiens.GRCh38.${params.ensembl_release}.gtf.gz" -o annotation.gtf.gz
     gunzip -f transcripts.fa.gz annotation.gtf.gz
     salmon index -t transcripts.fa -i salmon_index -k 31

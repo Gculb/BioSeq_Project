@@ -1,8 +1,8 @@
 # BioSeq
 
 [![BioSeq CLI](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml)
-[![RNA-seq pipeline](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml)
-[![HG002 pipeline](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml)
+[![RNA-seq CI checks](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml/badge.svg?branch=main&event=push)](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml)
+[HG002 workflow (manual)](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml)
 
 **BioSeq is a small Python toolkit for getting common genomics files into a
 usable, inspectable state.** It provides file validation and summary reports,
@@ -106,8 +106,10 @@ python -m bioseq.download fastq SRR123456 --threads 4
 
 ## Run the example workflows
 
-Both are optional, resource-intensive examples and require Java 17, Nextflow
-24.10.5, Docker, and a Linux environment (WSL2 is suitable on Windows). See
+The Nextflow examples are optional, resource-intensive runs and require Java
+17, Nextflow 24.10.5, Docker, and a Linux environment (WSL2 is suitable on
+Windows). The direct HG002 comparison can also be run with Docker Compose in
+PowerShell as shown below. See
 [the workflow and scaling notes](./ARCHITECTURE.md) before running larger data.
 
 Raw-read RNA-seq:
@@ -124,19 +126,60 @@ The full run downloads multiple public FASTQ files and needs additional disk
 space for reads, trimmed files, and the Salmon index. It produces a MultiQC
 report and DESeq2 results and plots.
 
-HG002 regional pilot (after building the benchmark image):
+### Reproduce the HG002 benchmark results
+
+Run from the repository root in PowerShell with Docker Desktop running. The
+prepared inputs are large and ignored by Git, so prepare them only if they are
+not already present. Preparation writes to a new directory and will not
+overwrite existing data.
+
+```powershell
+docker compose build bioseq
+
+$prepared = "data/benchmark/giab_hg002_chr20"
+if (-not (Test-Path $prepared)) {
+  $prepared = "data/benchmark/giab_hg002_chr20_rerun"
+  docker compose run --rm bioseq python -m bioseq.giab_data `
+    --interval chr20:10000000-11000000 `
+    --threads 2 `
+    --output-dir $prepared
+}
+```
+
+Run the direct-tool and BioSeq-wrapper workflows and compare both call sets to
+the GIAB truth set. Each comparison needs a new output directory:
+
+```powershell
+$outdir = "results/HG002_chr20_comparison_rerun"
+docker compose run --rm bioseq python -m bioseq.full_benchmark `
+  --read1 "$prepared/HG002_R1.fastq" `
+  --read2 "$prepared/HG002_R2.fastq" `
+  --reference-fasta "$prepared/chr20.fa" `
+  --known-sites-vcf "$prepared/Mills.hg38.region.vcf.gz" `
+  --reference-sdf "$prepared/chr20.sdf" `
+  --truth-vcf "$prepared/HG002.truth.region.vcf.gz" `
+  --confident-regions "$prepared/HG002_chr20_10000000_11000000.confident.bed" `
+  --interval chr20:10000000-11000000 `
+  --threads 2 `
+  --output-dir $outdir
+```
+
+The comparison command intentionally refuses to overwrite results. If you run
+it again, change `$outdir` to a new name, such as
+`results/HG002_chr20_comparison_rerun2`.
+
+To run the separate stage-by-stage Nextflow DAG instead (it runs direct tools
+and truth-scoring, but does not produce the wrapper-versus-direct comparison
+table above), use Linux/WSL2 with Java 17, Nextflow 24.10.5, and Docker:
 
 ```bash
 docker build -f containers/Dockerfile -t bioseq:latest .
 nextflow run hg002.nf -profile docker \
+  --prepared-dir data/benchmark/giab_hg002_chr20 \
   --interval chr20:10000000-11000000 \
   --threads 2 \
-  --outdir results/HG002_nextflow
+  --outdir results/HG002_nextflow_rerun
 ```
-
-For the wrapper-versus-direct baseline and truth-set comparison, follow the
-commands in the [HG002 architecture and results documentation](./ARCHITECTURE.md)
-and [analysis report](./PIPELINE_ANALYSIS.md).
 
 ## Reproducibility and execution status
 
