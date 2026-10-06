@@ -1,4 +1,4 @@
-name: BioSeq CLI
+name: SeqCheckFlow CLI
 
 on:
   push:
@@ -30,11 +30,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          output_dir="${RUNNER_TEMP}/bioseq-cli-results"
+          output_dir="${RUNNER_TEMP}/seqcheckflow-cli-results"
 
-          python -m bioseq.pipeline data/examples/example.fasta \
+          python -m seqcheckflow.pipeline data/examples/example.fasta \
             --results-dir "${output_dir}/fasta"
-          python -m bioseq.pipeline data/examples/example.fastq \
+          python -m seqcheckflow.pipeline data/examples/example.fastq \
             --results-dir "${output_dir}/fastq"
 
           test -s "${output_dir}/fasta/example_report.json"

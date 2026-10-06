@@ -5,7 +5,7 @@
 This report presents two separate analyses: a completed HG002 chromosome 20
 pilot in `results/HG002_chr20_comparison/` and a completed raw-read RNA-seq
 reanalysis of the public airway smooth-muscle study. The HG002 comparison uses
-the same tools and arguments for a direct-tool baseline and BioSeq wrappers;
+the same tools and arguments for a direct-tool baseline and SeqCheckFlow wrappers;
 the interval is `chr20:10000000-11000000`, a one-megabase regional experiment,
 not whole-genome validation. The RNA-seq findings come from eight raw-read
 libraries processed through fastp, Salmon, tximport, and DESeq2, not from the
@@ -13,7 +13,7 @@ synthetic smoke-test data.
 
 ## Main findings
 
-| Measure | Direct-tool baseline | BioSeq wrappers | Interpretation |
+| Measure | Direct-tool baseline | SeqCheckFlow wrappers | Interpretation |
 | --- | ---: | ---: | --- |
 | Wall time | 327.71 s | 302.35 s | One measurement was 25.36 s (7.7%) faster with wrappers. |
 | Peak sampled process-tree RSS | 584.5 MiB | 561.6 MiB | Wrapper run was 22.9 MiB lower in this measurement. |
@@ -25,7 +25,7 @@ synthetic smoke-test data.
 | Sensitivity / recall | 0.9962 | 0.9962 | Same. |
 | F1 | 0.9962 | 0.9962 | Same. |
 
-![HG002 baseline and BioSeq wrapper truth-set accuracy](docs/images/hg002-accuracy-parity.svg)
+![HG002 baseline and SeqCheckFlow wrapper truth-set accuracy](docs/images/hg002-accuracy-parity.svg)
 
 ![HG002 total wall time and peak sampled RSS](docs/images/hg002-runtime-memory.svg)
 
@@ -33,7 +33,7 @@ synthetic smoke-test data.
 
 The identical truth-set scores are expected: both paths run the same aligner,
 caller, tool versions, arguments, and data. This supports wrapper parity for
-this pilot; it does not show that BioSeq improves variant accuracy.
+this pilot; it does not show that SeqCheckFlow improves variant accuracy.
 
 The runtime and memory differences are descriptive, not established
 performance gains. Each workflow ran once, so machine load, caching, and task

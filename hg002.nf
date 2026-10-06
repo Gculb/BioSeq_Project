@@ -6,7 +6,7 @@ params.outdir = "results/HG002_nextflow"
 params.prepared_dir = null
 
 process PREPARE_GIAB {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cache false
 
     input:
@@ -18,7 +18,7 @@ process PREPARE_GIAB {
 
     script:
     """
-    python -m bioseq.giab_data \\
+    python -m seqcheckflow.giab_data \\
       --interval '${interval}' \\
       --threads ${threads} \\
       --output-dir prepared
@@ -26,7 +26,7 @@ process PREPARE_GIAB {
 }
 
 process FASTQ_QC {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     publishDir "${params.outdir}/qc", mode: "copy"
 
     input:
@@ -38,13 +38,13 @@ process FASTQ_QC {
 
     script:
     """
-    python -m bioseq.pipeline ${read1} --results-dir read1_qc
-    python -m bioseq.pipeline ${read2} --results-dir read2_qc
+    python -m seqcheckflow.pipeline ${read1} --results-dir read1_qc
+    python -m seqcheckflow.pipeline ${read2} --results-dir read2_qc
     """
 }
 
 process SETUP_REFERENCE {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -70,7 +70,7 @@ process SETUP_REFERENCE {
 }
 
 process BWA_ALIGN {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -92,7 +92,7 @@ process BWA_ALIGN {
 }
 
 process SAM_TO_BAM {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
 
     input:
     path alignment_sam
@@ -107,7 +107,7 @@ process SAM_TO_BAM {
 }
 
 process NAME_SORT {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -124,7 +124,7 @@ process NAME_SORT {
 }
 
 process FIXMATE {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -141,7 +141,7 @@ process FIXMATE {
 }
 
 process COORDINATE_SORT {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -158,7 +158,7 @@ process COORDINATE_SORT {
 }
 
 process MARK_DUPLICATES {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -180,7 +180,7 @@ process MARK_DUPLICATES {
 }
 
 process BASE_RECALIBRATOR {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -202,7 +202,7 @@ process BASE_RECALIBRATOR {
 }
 
 process APPLY_BQSR {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
 
     input:
@@ -229,7 +229,7 @@ process APPLY_BQSR {
 }
 
 process HAPLOTYPE_CALLER {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     cpus params.threads
     publishDir "${params.outdir}/variants", mode: "copy"
 
@@ -252,7 +252,7 @@ process HAPLOTYPE_CALLER {
 }
 
 process VCF_QC {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     publishDir "${params.outdir}/qc", mode: "copy"
 
     input:
@@ -263,12 +263,12 @@ process VCF_QC {
 
     script:
     """
-    python -m bioseq.pipeline ${calls_vcf} --results-dir vcf_qc
+    python -m seqcheckflow.pipeline ${calls_vcf} --results-dir vcf_qc
     """
 }
 
 process SCORE_VARIANTS {
-    container "bioseq:latest"
+    container "seqcheckflow:latest"
     publishDir "${params.outdir}/truth_evaluation", mode: "copy"
 
     input:

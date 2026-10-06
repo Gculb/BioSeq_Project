@@ -1,4 +1,4 @@
-name: BioSeq RNA-seq
+name: SeqCheckFlow RNA-seq
 
 on:
   push:
@@ -21,14 +21,14 @@ jobs:
           version: "24.10.5"
 
       - name: Build RNA-seq container
-        run: docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
+        run: docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
 
       - name: Smoke-test tximport and DESeq2 analysis
         run: |
           docker run --rm \
             --mount "type=bind,source=$PWD,target=/workspace" \
             -w /workspace \
-            bioseq-rnaseq:latest \
+            seqcheckflow-rnaseq:latest \
             Rscript tests/rnaseq_smoke.R analysis/rnaseq_airway_deseq2.R
 
       - name: Validate RNA-seq workflow and sample sheet
@@ -50,13 +50,13 @@ jobs:
           version: "24.10.5"
 
       - name: Build RNA-seq container
-        run: docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
+        run: docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
 
       - name: Run raw-read differential-expression workflow
         run: |
           nextflow run main.nf \
             -profile docker \
-            --outdir "${RUNNER_TEMP}/bioseq-rnaseq-raw-results" \
+            --outdir "${RUNNER_TEMP}/seqcheckflow-rnaseq-raw-results" \
             --threads 2 \
             -with-report "${RUNNER_TEMP}/nextflow-report.html" \
             -with-trace "${RUNNER_TEMP}/nextflow-trace.txt"
@@ -64,7 +64,7 @@ jobs:
       - name: Verify analysis reports
         run: |
           set -euo pipefail
-          results="${RUNNER_TEMP}/bioseq-rnaseq-raw-results"
+          results="${RUNNER_TEMP}/seqcheckflow-rnaseq-raw-results"
           test -s "${results}/qc/N61311_untrt.fastp.html"
           test -s "${results}/quant/N61311_untrt.quant.sf"
           test -s "${results}/multiqc/multiqc_report.html"
@@ -92,6 +92,6 @@ jobs:
         with:
           name: airway-raw-rnaseq-results
           path: |
-            ${{ runner.temp }}/bioseq-rnaseq-raw-results/
+            ${{ runner.temp }}/seqcheckflow-rnaseq-raw-results/
             ${{ runner.temp }}/nextflow-report.html
             ${{ runner.temp }}/nextflow-trace.txt

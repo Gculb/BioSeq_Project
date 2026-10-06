@@ -27,7 +27,7 @@ def analyze_fastq(filename):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="BioSeq: a small bioinformatics sequence analysis toolkit"
+        description="SeqCheckFlow: a small bioinformatics sequence analysis toolkit"
     )
 
     parser.add_argument("filename", help="FASTA or FASTQ file to analyze")

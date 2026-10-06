@@ -249,7 +249,7 @@ def analyze_alignment(alignment_file, reference_file=None, region=None):
     if extension == ".cram" and reference_file is not None:
         reference_file = require_file(reference_file, "Reference")
         samtools = _resolve_samtools()
-        with tempfile.TemporaryDirectory(prefix="bioseq_cram_") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="seqcheckflow_cram_") as temp_dir:
             decoded_bam = os.path.join(temp_dir, "decoded.bam")
             with staged_output_path(decoded_bam) as temporary_path:
                 run_command(

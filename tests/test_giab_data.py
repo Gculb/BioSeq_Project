@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.giab_data import (
+from seqcheckflow.giab_data import (
     _extract_paired_fastq,
     _read_extraction_region,
     _restrict_confident_regions,
@@ -30,7 +30,7 @@ class GiabRegionPreparationTests(unittest.TestCase):
                             fastq.write("@read\nACGT\n+\nIIII\n")
                 return ""
 
-            with patch("bioseq.giab_data.run_command", side_effect=mock_run) as run:
+            with patch("seqcheckflow.giab_data.run_command", side_effect=mock_run) as run:
                 _extract_paired_fastq("samtools", 2, "regional.bam", read1, read2)
 
             self.assertEqual(run.call_count, 2)

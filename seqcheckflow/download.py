@@ -63,7 +63,7 @@ def _download_url_file(url, output_dir, filename, allowed_extensions, file_type)
 
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "BioSeq/1.0 (sequence data downloader)"},
+        headers={"User-Agent": "SeqCheckFlow/1.0 (sequence data downloader)"},
     )
     descriptor, temporary_path = tempfile.mkstemp(
         prefix=f".{filename}.", suffix=".part", dir=output_dir
@@ -165,7 +165,7 @@ def download_alignment_file(url, output_dir=None, filename=None):
     """Download an aligned BAM or CRAM file from a direct HTTP(S) URL.
 
     By default, alignments are saved in ``data/alignments/``. BAM files may
-    be coordinate sorted and indexed afterward using ``bioseq.samtools``.
+    be coordinate sorted and indexed afterward using ``seqcheckflow.samtools``.
     """
     return _download_url_file(
         url,

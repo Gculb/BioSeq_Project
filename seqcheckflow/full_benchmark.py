@@ -53,7 +53,7 @@ def compare_germline_workflows(
     sample_name="HG002",
     threads=2,
 ):
-    """Run direct-tool baseline and BioSeq wrapper workflows, then compare accuracy."""
+    """Run direct-tool baseline and SeqCheckFlow wrapper workflows, then compare accuracy."""
     read1 = require_file(read1, "Read 1 FASTQ")
     read2 = require_file(read2, "Read 2 FASTQ")
     reference_fasta = require_file(reference_fasta, "Reference FASTA")
@@ -81,37 +81,37 @@ def compare_germline_workflows(
         threads=threads,
         implementation="baseline",
     )
-    bioseq = run_germline_workflow(
+    seqcheckflow = run_germline_workflow(
         read1,
         read2,
         reference_fasta,
         known_sites_vcf,
         interval,
-        os.path.join(output_dir, "bioseq"),
+        os.path.join(output_dir, "seqcheckflow"),
         sample_name=sample_name,
         threads=threads,
-        implementation="bioseq",
+        implementation="seqcheckflow",
     )
-    if baseline["tool_versions"] != bioseq["tool_versions"]:
-        raise RuntimeError("Baseline and BioSeq runs used different tool versions.")
+    if baseline["tool_versions"] != seqcheckflow["tool_versions"]:
+        raise RuntimeError("Baseline and SeqCheckFlow runs used different tool versions.")
 
     accuracy = benchmark_variant_calls(
         truth_vcf,
         baseline["variant_vcf"],
-        bioseq["variant_vcf"],
+        seqcheckflow["variant_vcf"],
         reference_sdf,
         os.path.join(output_dir, "truth_evaluation"),
         regions_bed=confident_regions_bed,
     )
     baseline_stages = {stage["name"]: stage for stage in baseline["stages"]}
-    bioseq_stages = {stage["name"]: stage for stage in bioseq["stages"]}
-    if baseline_stages.keys() != bioseq_stages.keys():
-        raise RuntimeError("Baseline and BioSeq runs executed different stages.")
+    seqcheckflow_stages = {stage["name"]: stage for stage in seqcheckflow["stages"]}
+    if baseline_stages.keys() != seqcheckflow_stages.keys():
+        raise RuntimeError("Baseline and SeqCheckFlow runs executed different stages.")
 
     stage_deltas = {}
     for name in baseline_stages:
         stage_deltas[name] = {
-            metric: bioseq_stages[name][metric] - baseline_stages[name][metric]
+            metric: seqcheckflow_stages[name][metric] - baseline_stages[name][metric]
             for metric in PERFORMANCE_METRICS
         }
     report_path = os.path.join(output_dir, "comparison.json")
@@ -119,7 +119,7 @@ def compare_germline_workflows(
         "sample": sample_name,
         "region": interval,
         "threads": threads,
-        "tool_versions": bioseq["tool_versions"],
+        "tool_versions": seqcheckflow["tool_versions"],
         "benchmark_inputs": {
             "truth_vcf": {
                 "path": truth_vcf,
@@ -137,7 +137,7 @@ def compare_germline_workflows(
         "baseline": {
             "definition": (
                 "Direct BWA, samtools, and GATK CLI calls using the same fixed "
-                "arguments as the BioSeq wrapper workflow."
+                "arguments as the SeqCheckFlow wrapper workflow."
             ),
             "workflow_report": baseline["report_file"],
             "total_wall_seconds": baseline["total_wall_seconds"],
@@ -145,23 +145,23 @@ def compare_germline_workflows(
             "total_output_bytes": baseline["total_output_bytes"],
             "stages": baseline_stages,
         },
-        "bioseq": {
-            "definition": "Same tool versions and arguments invoked through BioSeq wrappers.",
-            "workflow_report": bioseq["report_file"],
-            "total_wall_seconds": bioseq["total_wall_seconds"],
-            "peak_stage_rss_bytes": bioseq["peak_stage_rss_bytes"],
-            "total_output_bytes": bioseq["total_output_bytes"],
-            "stages": bioseq_stages,
+        "seqcheckflow": {
+            "definition": "Same tool versions and arguments invoked through SeqCheckFlow wrappers.",
+            "workflow_report": seqcheckflow["report_file"],
+            "total_wall_seconds": seqcheckflow["total_wall_seconds"],
+            "peak_stage_rss_bytes": seqcheckflow["peak_stage_rss_bytes"],
+            "total_output_bytes": seqcheckflow["total_output_bytes"],
+            "stages": seqcheckflow_stages,
         },
         "candidate_minus_baseline": {
             "total_wall_seconds": (
-                bioseq["total_wall_seconds"] - baseline["total_wall_seconds"]
+                seqcheckflow["total_wall_seconds"] - baseline["total_wall_seconds"]
             ),
             "peak_stage_rss_bytes": (
-                bioseq["peak_stage_rss_bytes"] - baseline["peak_stage_rss_bytes"]
+                seqcheckflow["peak_stage_rss_bytes"] - baseline["peak_stage_rss_bytes"]
             ),
             "total_output_bytes": (
-                bioseq["total_output_bytes"] - baseline["total_output_bytes"]
+                seqcheckflow["total_output_bytes"] - baseline["total_output_bytes"]
             ),
             "stages": stage_deltas,
         },
@@ -183,7 +183,7 @@ def compare_germline_workflows(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run BioSeq and direct-tool germline workflows and compare to GIAB truth."
+        description="Run SeqCheckFlow and direct-tool germline workflows and compare to GIAB truth."
     )
     parser.add_argument("--read1", required=True)
     parser.add_argument("--read2", required=True)
@@ -217,7 +217,7 @@ def main():
 
     comparison = report["candidate_minus_baseline"]
     print(
-        "BioSeq minus direct-tool baseline: "
+        "SeqCheckFlow minus direct-tool baseline: "
         f"{comparison['total_wall_seconds']:.3f} wall seconds, "
         f"{comparison['peak_stage_rss_bytes']} peak-RSS bytes"
     )

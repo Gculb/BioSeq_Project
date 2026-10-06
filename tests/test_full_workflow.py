@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.workflow import run_germline_workflow
+from seqcheckflow.workflow import run_germline_workflow
 
 
 def make_fastq(filename, sequence="ACGT"):
@@ -50,10 +50,10 @@ class GermlineWorkflowTests(unittest.TestCase):
                 make_file(command[-1])
             return ""
 
-        return patch("bioseq.workflow.run_command", side_effect=run)
+        return patch("seqcheckflow.workflow.run_command", side_effect=run)
 
-    def test_bioseq_workflow_runs_wrappers_and_records_stage_metrics(self):
-        output_dir = os.path.join(self.temp_dir.name, "bioseq")
+    def test_seqcheckflow_workflow_runs_wrappers_and_records_stage_metrics(self):
+        output_dir = os.path.join(self.temp_dir.name, "seqcheckflow")
         metrics = {"variant_records": 1, "snps": 1}
         vcf_result = {
             "validation": {
@@ -65,44 +65,44 @@ class GermlineWorkflowTests(unittest.TestCase):
             "metrics": metrics,
         }
         with patch(
-            "bioseq.workflow.require_executable", side_effect=lambda name: name
-        ), patch("bioseq.workflow.index_reference") as index_ref, patch(
-            "bioseq.workflow.align_reads",
+            "seqcheckflow.workflow.require_executable", side_effect=lambda name: name
+        ), patch("seqcheckflow.workflow.index_reference") as index_ref, patch(
+            "seqcheckflow.workflow.align_reads",
             side_effect=lambda reads, ref, output, **kwargs: (
                 make_file(output),
                 output,
             )[1],
         ) as align, patch(
-            "bioseq.workflow.convert_sam_to_bam",
+            "seqcheckflow.workflow.convert_sam_to_bam",
             side_effect=lambda source, output: (make_file(output), output)[1],
         ), patch(
-            "bioseq.workflow.sort_bam",
+            "seqcheckflow.workflow.sort_bam",
             side_effect=lambda source, output, by_name=False: (
                 make_file(output),
                 output,
             )[1],
         ), patch(
-            "bioseq.workflow.fixmate",
+            "seqcheckflow.workflow.fixmate",
             side_effect=lambda source, output: (make_file(output), output)[1],
         ), patch(
-            "bioseq.workflow.mark_duplicates",
+            "seqcheckflow.workflow.mark_duplicates",
             side_effect=lambda source, output: (make_file(output), output)[1],
         ), patch(
-            "bioseq.workflow.index_bam",
+            "seqcheckflow.workflow.index_bam",
             side_effect=lambda bam: (make_file(f"{bam}.bai"), f"{bam}.bai")[1],
         ), patch(
-            "bioseq.workflow.analyze_alignment",
+            "seqcheckflow.workflow.analyze_alignment",
             return_value={"flagstat": {"mapped": 1}},
         ), patch(
-            "bioseq.workflow._run_gatk_haplotype_caller",
+            "seqcheckflow.workflow._run_gatk_haplotype_caller",
             side_effect=lambda ref, bam, interval, threads, output: (
                 make_file(output),
                 output,
             )[1],
         ), patch(
-            "bioseq.workflow.analyze_vcf", return_value=vcf_result
+            "seqcheckflow.workflow.analyze_vcf", return_value=vcf_result
         ), patch(
-            "bioseq.workflow._tool_versions",
+            "seqcheckflow.workflow._tool_versions",
             return_value={
                 "bwa": "test",
                 "samtools": "test",
@@ -119,7 +119,7 @@ class GermlineWorkflowTests(unittest.TestCase):
                 output_dir,
             )
 
-        self.assertEqual(result["implementation"], "bioseq")
+        self.assertEqual(result["implementation"], "seqcheckflow")
         self.assertEqual(result["variant_metrics"], metrics)
         self.assertEqual(
             result["inputs"]["reference"]["size_bytes"], os.path.getsize(self.reference)
@@ -133,7 +133,7 @@ class GermlineWorkflowTests(unittest.TestCase):
         self.assertTrue(align.call_args.kwargs["read_group"].startswith("@RG\\t"))
         index_ref.assert_called_once()
 
-    def test_direct_tool_baseline_runs_bqsr_and_gatk_without_bioseq_wrappers(self):
+    def test_direct_tool_baseline_runs_bqsr_and_gatk_without_seqcheckflow_wrappers(self):
         output_dir = os.path.join(self.temp_dir.name, "baseline")
         vcf_result = {
             "validation": {
@@ -145,9 +145,9 @@ class GermlineWorkflowTests(unittest.TestCase):
             "metrics": {"variant_records": 1},
         }
         with patch(
-            "bioseq.workflow.require_executable", side_effect=lambda name: name
+            "seqcheckflow.workflow.require_executable", side_effect=lambda name: name
         ), patch(
-            "bioseq.workflow._tool_versions",
+            "seqcheckflow.workflow._tool_versions",
             return_value={
                 "bwa": "test",
                 "samtools": "test",
@@ -155,15 +155,15 @@ class GermlineWorkflowTests(unittest.TestCase):
                 "rtg": "test",
             },
         ), patch(
-            "bioseq.workflow.analyze_alignment", return_value={"coverage": []}
+            "seqcheckflow.workflow.analyze_alignment", return_value={"coverage": []}
         ), patch(
-            "bioseq.workflow._run_gatk_haplotype_caller",
+            "seqcheckflow.workflow._run_gatk_haplotype_caller",
             side_effect=lambda ref, bam, interval, threads, output: (
                 make_file(output),
                 output,
             )[1],
         ), patch(
-            "bioseq.workflow.analyze_vcf", return_value=vcf_result
+            "seqcheckflow.workflow.analyze_vcf", return_value=vcf_result
         ), self._mock_common_tools() as run_command:
             result = run_germline_workflow(
                 self.read1,

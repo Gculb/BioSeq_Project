@@ -1,4 +1,4 @@
-name: BioSeq HG002 Nextflow benchmark
+name: SeqCheckFlow HG002 Nextflow benchmark
 
 on:
   workflow_dispatch:
@@ -19,8 +19,8 @@ jobs:
         with:
           version: "24.10.5"
 
-      - name: Build pinned BioSeq tool image
-        run: docker build -f containers/Dockerfile -t bioseq:latest .
+      - name: Build pinned SeqCheckFlow tool image
+        run: docker build -f containers/Dockerfile -t seqcheckflow:latest .
 
       - name: Prepare and run the HG002 pilot
         run: |
@@ -28,14 +28,14 @@ jobs:
             -profile docker \
             --interval chr20:10000000-11000000 \
             --threads 2 \
-            --outdir "${RUNNER_TEMP}/bioseq-hg002-results" \
+            --outdir "${RUNNER_TEMP}/seqcheckflow-hg002-results" \
             -with-report "${RUNNER_TEMP}/hg002-nextflow-report.html" \
             -with-trace "${RUNNER_TEMP}/hg002-nextflow-trace.txt"
 
       - name: Verify benchmark outputs
         run: |
           set -euo pipefail
-          results="${RUNNER_TEMP}/bioseq-hg002-results"
+          results="${RUNNER_TEMP}/seqcheckflow-hg002-results"
           test -s "${results}/variants/calls.vcf.gz"
           test -s "${results}/truth_evaluation/rtg_eval/summary.txt"
           test -s "${results}/qc/vcf_qc/calls_report.json"
@@ -45,6 +45,6 @@ jobs:
         with:
           name: hg002-nextflow-results
           path: |
-            ${{ runner.temp }}/bioseq-hg002-results/
+            ${{ runner.temp }}/seqcheckflow-hg002-results/
             ${{ runner.temp }}/hg002-nextflow-report.html
             ${{ runner.temp }}/hg002-nextflow-trace.txt

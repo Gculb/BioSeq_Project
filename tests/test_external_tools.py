@@ -5,9 +5,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from bioseq.alignment import align_reads, convert_sam_to_bam, index_reference
-from bioseq.blast import BLAST_search
-from bioseq.samtools import (
+from seqcheckflow.alignment import align_reads, convert_sam_to_bam, index_reference
+from seqcheckflow.blast import BLAST_search
+from seqcheckflow.samtools import (
     analyze_alignment,
     coverage,
     depth,
@@ -49,8 +49,8 @@ class BlastTests(unittest.TestCase):
             ],
         )
         response = StringIO("<BlastOutput/>")
-        with patch("bioseq.blast.NCBIWWW.qblast", return_value=response) as qblast, patch(
-            "bioseq.blast.NCBIXML.read", return_value=record
+        with patch("seqcheckflow.blast.NCBIWWW.qblast", return_value=response) as qblast, patch(
+            "seqcheckflow.blast.NCBIXML.read", return_value=record
         ):
             hits = BLAST_search(
                 "ACGT",
@@ -85,8 +85,8 @@ class AlignmentTests(unittest.TestCase):
                 with open(path, "w", encoding="utf-8") as file_handle:
                     file_handle.write("fixture\n")
 
-            with patch("bioseq.alignment.require_executable", return_value="bwa"), patch(
-                "bioseq.alignment.run_command", return_value=output
+            with patch("seqcheckflow.alignment.require_executable", return_value="bwa"), patch(
+                "seqcheckflow.alignment.run_command", return_value=output
             ) as run_command:
                 result = align_reads(reads, reference, output, threads=3)
 
@@ -106,8 +106,8 @@ class AlignmentTests(unittest.TestCase):
                 with open(path, "w", encoding="utf-8") as file_handle:
                     file_handle.write("fixture\n")
             read_group = "@RG\\tID:sample\\tSM:sample\\tPL:ILLUMINA"
-            with patch("bioseq.alignment.require_executable", return_value="bwa"), patch(
-                "bioseq.alignment.run_command", return_value=output
+            with patch("seqcheckflow.alignment.require_executable", return_value="bwa"), patch(
+                "seqcheckflow.alignment.run_command", return_value=output
             ) as run_command:
                 align_reads(reads, reference, output, read_group=read_group)
 
@@ -120,8 +120,8 @@ class AlignmentTests(unittest.TestCase):
             reference = os.path.join(directory, "reference.fasta")
             with open(reference, "w", encoding="utf-8") as file_handle:
                 file_handle.write(">chr1\nACGT\n")
-            with patch("bioseq.alignment.require_executable", return_value="bwa"), patch(
-                "bioseq.alignment.run_command"
+            with patch("seqcheckflow.alignment.require_executable", return_value="bwa"), patch(
+                "seqcheckflow.alignment.run_command"
             ) as run_command:
                 result = index_reference(reference)
 
@@ -136,7 +136,7 @@ class AlignmentTests(unittest.TestCase):
                 with open(path, "w", encoding="utf-8") as file_handle:
                     file_handle.write("fixture\n")
 
-            with patch("bioseq.alignment.require_executable", return_value="bwa"):
+            with patch("seqcheckflow.alignment.require_executable", return_value="bwa"):
                 with self.assertRaisesRegex(FileNotFoundError, "bwa index"):
                     align_reads(reads, reference, os.path.join(directory, "out.sam"))
 
@@ -150,9 +150,9 @@ class AlignmentTests(unittest.TestCase):
                     file_handle.write("fixture\n")
 
             with patch(
-                "bioseq.alignment.require_executable", return_value="minimap2"
+                "seqcheckflow.alignment.require_executable", return_value="minimap2"
             ), patch(
-                "bioseq.alignment.run_command", return_value=output
+                "seqcheckflow.alignment.run_command", return_value=output
             ) as run_command:
                 result = align_reads(
                     reads, reference, output, aligner="minimap2", threads=2
@@ -170,8 +170,8 @@ class AlignmentTests(unittest.TestCase):
             with open(sam, "w", encoding="utf-8") as file_handle:
                 file_handle.write("@HD\n")
 
-            with patch("bioseq.alignment.require_executable", return_value="samtools"), patch(
-                "bioseq.alignment.run_command", side_effect=successful_tool
+            with patch("seqcheckflow.alignment.require_executable", return_value="samtools"), patch(
+                "seqcheckflow.alignment.run_command", side_effect=successful_tool
             ) as run_command:
                 result = convert_sam_to_bam(sam)
 
@@ -186,20 +186,20 @@ class SamtoolsTests(unittest.TestCase):
         self.bam = os.path.join(self.temp_dir.name, "alignments.bam")
         with open(self.bam, "wb") as file_handle:
             file_handle.write(b"bam fixture")
-        self.tool_patch = patch("bioseq.samtools.require_executable", return_value="samtools")
+        self.tool_patch = patch("seqcheckflow.samtools.require_executable", return_value="samtools")
         self.tool_patch.start()
         self.addCleanup(self.tool_patch.stop)
         self.addCleanup(self.temp_dir.cleanup)
 
     def test_sort_bam_creates_sorted_output(self):
-        with patch("bioseq.samtools.run_command", side_effect=successful_tool):
+        with patch("seqcheckflow.samtools.run_command", side_effect=successful_tool):
             sorted_bam = sort_bam(self.bam)
 
         self.assertEqual(sorted_bam, os.path.join(self.temp_dir.name, "alignments.sorted.bam"))
         self.assertTrue(os.path.isfile(sorted_bam))
 
     def test_name_sort_uses_name_order_flag(self):
-        with patch("bioseq.samtools.run_command", side_effect=successful_tool) as command:
+        with patch("seqcheckflow.samtools.run_command", side_effect=successful_tool) as command:
             sorted_bam = sort_bam(self.bam, by_name=True)
 
         self.assertTrue(sorted_bam.endswith(".name_sorted.bam"))
@@ -214,19 +214,19 @@ class SamtoolsTests(unittest.TestCase):
                 file_handle.write(b"tool output")
             return ""
 
-        with patch("bioseq.samtools.run_command", side_effect=create_last_output) as command:
+        with patch("seqcheckflow.samtools.run_command", side_effect=create_last_output) as command:
             self.assertEqual(fixmate(self.bam, fixmate_output), fixmate_output)
             self.assertEqual(command.call_args.args[0][1], "fixmate")
             self.assertIn("-m", command.call_args.args[0])
 
-        with patch("bioseq.samtools.run_command", side_effect=create_last_output) as command:
+        with patch("seqcheckflow.samtools.run_command", side_effect=create_last_output) as command:
             self.assertEqual(
                 mark_duplicates(self.bam, marked_output), marked_output
             )
             self.assertEqual(command.call_args.args[0][1], "markdup")
 
     def test_index_bam_creates_index(self):
-        with patch("bioseq.samtools.run_command", side_effect=successful_tool):
+        with patch("seqcheckflow.samtools.run_command", side_effect=successful_tool):
             index_file = index_bam(self.bam)
 
         self.assertEqual(index_file, f"{self.bam}.bai")
@@ -238,7 +238,7 @@ class SamtoolsTests(unittest.TestCase):
             "10 + 1 mapped (83.33% : 100.00%)\n"
             "2 + 0 unmapped\n"
         )
-        with patch("bioseq.samtools.run_command", return_value=output):
+        with patch("seqcheckflow.samtools.run_command", return_value=output):
             result = flagstat(self.bam)
 
         self.assertEqual(result["in total"]["passed"], 12)
@@ -253,7 +253,7 @@ class SamtoolsTests(unittest.TestCase):
             "SN\taverage length:\t150.5\n"
             "LF\tignored format line\n"
         )
-        with patch("bioseq.samtools.run_command", return_value=output):
+        with patch("seqcheckflow.samtools.run_command", return_value=output):
             result = stats(self.bam)
 
         self.assertEqual(result, {
@@ -264,7 +264,7 @@ class SamtoolsTests(unittest.TestCase):
 
     def test_depth_can_return_text_or_write_a_file(self):
         depth_text = "chr1\t1\t4\nchr1\t2\t8\n"
-        with patch("bioseq.samtools.run_command", return_value=depth_text) as run_command:
+        with patch("seqcheckflow.samtools.run_command", return_value=depth_text) as run_command:
             result = depth(self.bam)
         self.assertEqual(result, depth_text)
         self.assertEqual(run_command.call_args.args[0][:2], ["samtools", "depth"])
@@ -276,7 +276,7 @@ class SamtoolsTests(unittest.TestCase):
                 file_handle.write(depth_text)
             return stdout_path
 
-        with patch("bioseq.samtools.run_command", side_effect=write_depth):
+        with patch("seqcheckflow.samtools.run_command", side_effect=write_depth):
             result_path = depth(self.bam, output_file=output_path)
         self.assertEqual(result_path, output_path)
         with open(output_path, encoding="utf-8") as file_handle:
@@ -297,14 +297,14 @@ class SamtoolsTests(unittest.TestCase):
                 file_handle.write(b"decoded bam")
             return ""
 
-        with patch("bioseq.samtools.quickcheck"), patch(
-            "bioseq.samtools.run_command", side_effect=convert_cram
+        with patch("seqcheckflow.samtools.quickcheck"), patch(
+            "seqcheckflow.samtools.run_command", side_effect=convert_cram
         ), patch(
-            "bioseq.samtools.flagstat", return_value={"mapped": {"passed": 8}}
+            "seqcheckflow.samtools.flagstat", return_value={"mapped": {"passed": 8}}
         ) as mock_flagstat, patch(
-            "bioseq.samtools.stats", return_value={"raw total sequences": 10}
+            "seqcheckflow.samtools.stats", return_value={"raw total sequences": 10}
         ) as mock_stats, patch(
-            "bioseq.samtools.coverage", return_value=[{"reference": "chr1"}]
+            "seqcheckflow.samtools.coverage", return_value=[{"reference": "chr1"}]
         ) as mock_coverage:
             result = analyze_alignment(cram_file, reference_file=reference_file)
 
@@ -322,7 +322,7 @@ class SamtoolsTests(unittest.TestCase):
             "#rname\tstartpos\tendpos\tnumreads\tcovbases\tcoverage\tmeandepth\tmeanbaseq\tmeanmapq\n"
             "chr20\t10000000\t11000000\t2500\t950000\t95.0\t30.5\t35.2\t59.8\n"
         )
-        with patch("bioseq.samtools.run_command", return_value=output) as command:
+        with patch("seqcheckflow.samtools.run_command", return_value=output) as command:
             result = coverage(self.bam, region="chr20:10000000-11000000")
 
         self.assertEqual(

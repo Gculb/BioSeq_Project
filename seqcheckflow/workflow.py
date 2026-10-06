@@ -205,15 +205,15 @@ def run_germline_workflow(
     output_dir,
     sample_name="HG002",
     threads=2,
-    implementation="bioseq",
+    implementation="seqcheckflow",
 ):
     """Run paired FASTQ alignment, duplicate marking, calling, and per-stage metrics.
 
     ``implementation="baseline"`` runs the documented BWA/samtools/GATK
-    commands directly instead of using BioSeq's wrappers, for parity testing.
+    commands directly instead of using SeqCheckFlow's wrappers, for parity testing.
     """
-    if implementation not in {"bioseq", "baseline"}:
-        raise ValueError("implementation must be 'bioseq' or 'baseline'.")
+    if implementation not in {"seqcheckflow", "baseline"}:
+        raise ValueError("implementation must be 'seqcheckflow' or 'baseline'.")
     if not isinstance(threads, int) or isinstance(threads, bool) or threads < 1:
         raise ValueError("threads must be a positive integer.")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", sample_name):
@@ -234,7 +234,7 @@ def run_germline_workflow(
     reference_index_files = [
         f"{reference}.{suffix}" for suffix in ("amb", "ann", "bwt", "pac", "sa")
     ]
-    if implementation == "bioseq":
+    if implementation == "seqcheckflow":
         _profile_stage(
             stages,
             "reference_index",
@@ -252,7 +252,7 @@ def run_germline_workflow(
 
     reference_fai = f"{reference}.fai"
     reference_dict = os.path.splitext(reference)[0] + ".dict"
-    if implementation == "bioseq":
+    if implementation == "seqcheckflow":
         samtools = require_executable("samtools")
         gatk = require_executable("gatk")
         _profile_stage(
@@ -314,7 +314,7 @@ def run_germline_workflow(
     bam_index = f"{deduplicated_bam}.bai"
     read_group = f"@RG\\tID:{sample_name}\\tSM:{sample_name}\\tPL:ILLUMINA"
 
-    if implementation == "bioseq":
+    if implementation == "seqcheckflow":
         _profile_stage(
             stages,
             "bwa_mem_alignment",
@@ -496,7 +496,7 @@ def run_germline_workflow(
         )
 
     _profile_stage(stages, "apply_bqsr", run_apply_bqsr, [recalibrated_bam])
-    if implementation == "bioseq":
+    if implementation == "seqcheckflow":
         _profile_stage(
             stages,
             "recalibrated_alignment_index",

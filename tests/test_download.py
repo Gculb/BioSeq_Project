@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.download import (
+from seqcheckflow.download import (
     download_alignment_file,
     download_bam,
     download_fastq,
@@ -27,8 +27,8 @@ class DownloadFastqTests(unittest.TestCase):
                 with open(os.path.join(output_dir, "SRR123456_2.fastq"), "w") as handle:
                     handle.write("@read/2\nTGCA\n+\nIIII\n")
 
-            with patch("bioseq.download.shutil.which", return_value="fasterq-dump"), patch(
-                "bioseq.download.subprocess.run", side_effect=run_fasterq
+            with patch("seqcheckflow.download.shutil.which", return_value="fasterq-dump"), patch(
+                "seqcheckflow.download.subprocess.run", side_effect=run_fasterq
             ) as run:
                 paths = download_fastq("SRR123456", output_dir=output_dir, threads=2)
 
@@ -48,14 +48,14 @@ class DownloadFastqTests(unittest.TestCase):
             download_fastq("NC_000913")
 
     def test_download_fastq_reports_missing_sra_toolkit(self):
-        with patch("bioseq.download.shutil.which", return_value=None):
+        with patch("seqcheckflow.download.shutil.which", return_value=None):
             with self.assertRaisesRegex(FileNotFoundError, "SRA Toolkit"):
                 download_fastq("SRR123456")
 
     def test_download_variant_vcf_saves_and_validates_compressed_vcf(self):
         vcf_data = b"##fileformat=VCFv4.2\n#CHROM\tPOS\tID\n"
         with tempfile.TemporaryDirectory() as output_dir, patch(
-            "bioseq.download.urllib.request.urlopen",
+            "seqcheckflow.download.urllib.request.urlopen",
             return_value=BytesIO(gzip.compress(vcf_data)),
         ):
             result = download_variant_vcf(
@@ -70,7 +70,7 @@ class DownloadFastqTests(unittest.TestCase):
     def test_download_bam_saves_and_validates_bam_payload(self):
         bam_data = gzip.compress(b"BAM\x01binary payload")
         with tempfile.TemporaryDirectory() as output_dir, patch(
-            "bioseq.download.urllib.request.urlopen",
+            "seqcheckflow.download.urllib.request.urlopen",
             return_value=BytesIO(bam_data),
         ):
             result = download_bam(
@@ -83,7 +83,7 @@ class DownloadFastqTests(unittest.TestCase):
 
     def test_download_alignment_file_accepts_cram(self):
         with tempfile.TemporaryDirectory() as output_dir, patch(
-            "bioseq.download.urllib.request.urlopen",
+            "seqcheckflow.download.urllib.request.urlopen",
             return_value=BytesIO(b"CRAM\x03binary payload"),
         ):
             result = download_alignment_file(
@@ -93,7 +93,7 @@ class DownloadFastqTests(unittest.TestCase):
 
     def test_download_variant_rejects_non_vcf_content(self):
         with tempfile.TemporaryDirectory() as output_dir, patch(
-            "bioseq.download.urllib.request.urlopen",
+            "seqcheckflow.download.urllib.request.urlopen",
             return_value=BytesIO(b"not a VCF file"),
         ):
             with self.assertRaisesRegex(ValueError, "VCF header"):

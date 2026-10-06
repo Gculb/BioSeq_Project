@@ -5,10 +5,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.pipeline import run_pipeline
-from bioseq.qc import analyze_fastq_quality
-from bioseq.validation import detect_sequence_format, validate_sequence_file
-from bioseq.variants import analyze_vcf
+from seqcheckflow.pipeline import run_pipeline
+from seqcheckflow.qc import analyze_fastq_quality
+from seqcheckflow.validation import detect_sequence_format, validate_sequence_file
+from seqcheckflow.variants import analyze_vcf
 
 
 class SequenceValidationTests(unittest.TestCase):
@@ -208,8 +208,8 @@ class PipelineTests(unittest.TestCase):
                 "stats": {"raw total sequences": 10},
                 "reference_file": None,
             }
-            with patch("bioseq.samtools.quickcheck"), patch(
-                "bioseq.pipeline.analyze_alignment", return_value=metrics
+            with patch("seqcheckflow.samtools.quickcheck"), patch(
+                "seqcheckflow.pipeline.analyze_alignment", return_value=metrics
             ) as analyze:
                 report = run_pipeline(input_file, results_dir=temp_dir)
 

@@ -1,13 +1,12 @@
-# BioSeq
+# SeqCheckFlow: Genomics QC & Workflow Toolkit
 
-[![BioSeq CLI](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml)
+[![SeqCheckFlow CLI](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gculb/BioSeq_Project/actions/workflows/ci.yml)
 [![RNA-seq CI checks](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml/badge.svg?branch=main&event=push)](https://github.com/Gculb/BioSeq_Project/actions/workflows/rnaseq.yml)
 [HG002 workflow (manual)](https://github.com/Gculb/BioSeq_Project/actions/workflows/hg002.yml)
 
-**BioSeq is a small Python toolkit for getting common genomics files into a
-usable, inspectable state.** It provides file validation and summary reports,
-download and standalone tool helpers, plus separate Nextflow examples for
-raw-read RNA-seq and regional variant calling.
+**SeqCheckFlow validates and summarizes common genomics files, with separate
+Nextflow workflows for RNA-seq and regional variant-calling benchmarks.** It
+also provides sequence download and standalone tool helpers.
 
 The aim is to make routine file handling and entry-level analysis more
 approachable—not to replace established bioinformatics tools, automatically
@@ -17,8 +16,8 @@ analyze every file type, or claim new biological findings.
 
 | Entry point | Current scope |
 | --- | --- |
-| `bioseq.pipeline` | Processes one local FASTA, FASTQ, VCF/VCF.GZ, BAM, or CRAM file and writes JSON/text validation and summary reports. |
-| `bioseq.download` | Searches/downloads NCBI sequence records and SRA FASTQ; downloads VCF/BAM/CRAM from direct URLs. |
+| `seqcheckflow.pipeline` | Processes one local FASTA, FASTQ, VCF/VCF.GZ, BAM, or CRAM file and writes JSON/text validation and summary reports. |
+| `seqcheckflow.download` | Searches/downloads NCBI sequence records and SRA FASTQ; downloads VCF/BAM/CRAM from direct URLs. |
 | Standalone helpers | Optional alignment (BWA/minimap2), samtools operations, and remote NCBI BLAST. These are separate calls, not automatically chained by the single-file CLI. |
 | `main.nf` | Eight-library airway RNA-seq example: ENA FASTQ → fastp → Salmon, then MultiQC QC and tximport/DESeq2 in R. |
 | `hg002.nf` and benchmark commands | Staged, single-sample HG002 regional variant-calling example and wrapper-versus-direct-tool comparison. |
@@ -39,8 +38,8 @@ The RNA-seq workflow also calls an R/DESeq2 analysis; the HG002 workflow uses
 the same underlying command-line tools in separately scheduled stages.
 
 ```text
-Local file ──> bioseq.pipeline ──> validation + format-specific summary ──> JSON/text
-NCBI/URL   ──> bioseq.download ──> downloaded file (analyze separately)
+Local file ──> seqcheckflow.pipeline ──> validation + format-specific summary ──> JSON/text
+NCBI/URL   ──> seqcheckflow.download ──> downloaded file (analyze separately)
 Raw RNA-seq ──> main.nf ──> fastp ──> Salmon ──┬─> MultiQC
                                                └─> tximport ──> R/DESeq2
 HG002 region ──> hg002.nf / benchmark ──> calls ──> GIAB truth comparison
@@ -57,7 +56,7 @@ general performance, broad biological conclusions, or clinical validity.
 
 | Example | Observed result | What it supports—and what it does not |
 | --- | --- | --- |
-| HG002 chr20 pilot | On a 1 Mb region, direct-tool and BioSeq-wrapper runs each had 1,582 true positives, 6 false positives, and 6 false negatives (precision/recall/F1 = 0.9962). | Supports wrapper parity for this run. The observed 328 s vs 302 s and 584.5 vs 561.6 MiB are single-run measurements, not proven performance gains. |
+| HG002 chr20 pilot | On a 1 Mb region, direct-tool and SeqCheckFlow-wrapper runs each had 1,582 true positives, 6 false positives, and 6 false negatives (precision/recall/F1 = 0.9962). | Supports wrapper parity for this run. The observed 328 s vs 302 s and 584.5 vs 561.6 MiB are single-run measurements, not proven performance gains. |
 | Airway RNA-seq (GSE52778) | Eight raw-read libraries completed fastp and Salmon quantification; mapping rates were 92.3–93.9%. DESeq2 (`~ cell + dex`) found no genes below BH-adjusted `p < 0.05`. | Demonstrates a raw-read-to-analysis path. Four donors from one study are insufficient to interpret this as evidence of no treatment effect or to claim independent validation. |
 
 The HG002 run is a regional, two-thread pilot—not whole-genome or cohort
@@ -85,7 +84,7 @@ require samtools installed on `PATH`.
 
 ```bash
 pip install -r requirements.txt
-python -m bioseq.pipeline data/examples/example.fasta
+python -m seqcheckflow.pipeline data/examples/example.fasta
 ```
 
 The command writes JSON and text reports to `results/` by default. Substitute
@@ -93,7 +92,7 @@ a local `.fastq`, `.vcf`, `.vcf.gz`, `.bam`, or `.cram` file to summarize anothe
 supported format. CRAM may require a matching reference:
 
 ```bash
-python -m bioseq.pipeline data/alignments/sample.cram \
+python -m seqcheckflow.pipeline data/alignments/sample.cram \
   --reference data/references/reference.fasta
 ```
 
@@ -101,7 +100,7 @@ Downloading is a separate step. For example, SRA FASTQ download uses the NCBI
 SRA Toolkit (`fasterq-dump`):
 
 ```bash
-python -m bioseq.download fastq SRR123456 --threads 4
+python -m seqcheckflow.download fastq SRR123456 --threads 4
 ```
 
 ## Run the example workflows
@@ -115,7 +114,7 @@ PowerShell as shown below. See
 Raw-read RNA-seq:
 
 ```bash
-docker build -f containers/rnaseq.Dockerfile -t bioseq-rnaseq:latest .
+docker build -f containers/rnaseq.Dockerfile -t seqcheckflow-rnaseq:latest .
 nextflow run main.nf -profile docker \
   --samplesheet analysis/airway_samples.tsv \
   --threads 2 \
@@ -134,24 +133,24 @@ not already present. Preparation writes to a new directory and will not
 overwrite existing data.
 
 ```powershell
-docker compose build bioseq
+docker compose build seqcheckflow
 
 $prepared = "data/benchmark/giab_hg002_chr20"
 if (-not (Test-Path $prepared)) {
   $prepared = "data/benchmark/giab_hg002_chr20_rerun"
-  docker compose run --rm bioseq python -m bioseq.giab_data `
+  docker compose run --rm seqcheckflow python -m seqcheckflow.giab_data `
     --interval chr20:10000000-11000000 `
     --threads 2 `
     --output-dir $prepared
 }
 ```
 
-Run the direct-tool and BioSeq-wrapper workflows and compare both call sets to
+Run the direct-tool and SeqCheckFlow-wrapper workflows and compare both call sets to
 the GIAB truth set. Each comparison needs a new output directory:
 
 ```powershell
 $outdir = "results/HG002_chr20_comparison_rerun"
-docker compose run --rm bioseq python -m bioseq.full_benchmark `
+docker compose run --rm seqcheckflow python -m seqcheckflow.full_benchmark `
   --read1 "$prepared/HG002_R1.fastq" `
   --read2 "$prepared/HG002_R2.fastq" `
   --reference-fasta "$prepared/chr20.fa" `
@@ -173,7 +172,7 @@ and truth-scoring, but does not produce the wrapper-versus-direct comparison
 table above), use Linux/WSL2 with Java 17, Nextflow 24.10.5, and Docker:
 
 ```bash
-docker build -f containers/Dockerfile -t bioseq:latest .
+docker build -f containers/Dockerfile -t seqcheckflow:latest .
 nextflow run hg002.nf -profile docker \
   --prepared-dir data/benchmark/giab_hg002_chr20 \
   --interval chr20:10000000-11000000 \

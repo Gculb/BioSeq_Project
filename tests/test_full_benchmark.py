@@ -4,11 +4,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.full_benchmark import compare_germline_workflows
+from seqcheckflow.full_benchmark import compare_germline_workflows
 
 
 class FullBenchmarkTests(unittest.TestCase):
-    def test_runs_baseline_and_bioseq_then_writes_combined_metrics(self):
+    def test_runs_baseline_and_seqcheckflow_then_writes_combined_metrics(self):
         with tempfile.TemporaryDirectory() as directory:
             read1 = os.path.join(directory, "read1.fastq")
             read2 = os.path.join(directory, "read2.fastq")
@@ -44,9 +44,9 @@ class FullBenchmarkTests(unittest.TestCase):
                     ],
                 },
                 {
-                    "implementation": "bioseq",
-                    "report_file": "bioseq/workflow.json",
-                    "variant_vcf": "bioseq/calls.vcf.gz",
+                    "implementation": "seqcheckflow",
+                    "report_file": "seqcheckflow/workflow.json",
+                    "variant_vcf": "seqcheckflow/calls.vcf.gz",
                     "total_wall_seconds": 13.0,
                     "peak_stage_rss_bytes": 1100,
                     "total_output_bytes": 2000,
@@ -67,10 +67,10 @@ class FullBenchmarkTests(unittest.TestCase):
                 "candidate": {"metrics": {"f1_score": 0.9}},
             }
             with patch(
-                "bioseq.full_benchmark.run_germline_workflow",
+                "seqcheckflow.full_benchmark.run_germline_workflow",
                 side_effect=workflow_results,
             ) as run_workflow, patch(
-                "bioseq.full_benchmark.benchmark_variant_calls",
+                "seqcheckflow.full_benchmark.benchmark_variant_calls",
                 return_value=evaluation,
             ):
                 result = compare_germline_workflows(

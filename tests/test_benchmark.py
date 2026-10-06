@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from bioseq.benchmark import benchmark_variant_calls
+from seqcheckflow.benchmark import benchmark_variant_calls
 
 
 SUMMARY = (
@@ -50,8 +50,8 @@ class VariantBenchmarkTests(unittest.TestCase):
                     file_handle.write(summary)
 
             with patch(
-                "bioseq.benchmark.require_executable", return_value="rtg"
-            ), patch("bioseq.benchmark.run_command", side_effect=run_rtg) as run_command:
+                "seqcheckflow.benchmark.require_executable", return_value="rtg"
+            ), patch("seqcheckflow.benchmark.run_command", side_effect=run_rtg) as run_command:
                 report = benchmark_variant_calls(
                     truth, baseline, candidate, reference, output_dir
                 )
@@ -91,8 +91,8 @@ class VariantBenchmarkTests(unittest.TestCase):
                     file_handle.write(SUMMARY)
 
             with patch(
-                "bioseq.benchmark.require_executable", return_value="rtg"
-            ), patch("bioseq.benchmark.run_command", side_effect=run_rtg) as run_command:
+                "seqcheckflow.benchmark.require_executable", return_value="rtg"
+            ), patch("seqcheckflow.benchmark.run_command", side_effect=run_rtg) as run_command:
                 benchmark_variant_calls(
                     truth,
                     baseline,
@@ -147,8 +147,8 @@ class VariantBenchmarkTests(unittest.TestCase):
                     )
 
             with patch(
-                "bioseq.benchmark.require_executable", return_value="rtg"
-            ), patch("bioseq.benchmark.run_command", side_effect=run_rtg):
+                "seqcheckflow.benchmark.require_executable", return_value="rtg"
+            ), patch("seqcheckflow.benchmark.run_command", side_effect=run_rtg):
                 with self.assertRaisesRegex(RuntimeError, "no unthresholded metric row"):
                     benchmark_variant_calls(
                         truth, baseline, candidate, reference, output_dir

@@ -34,7 +34,7 @@ READ_EXTRACTION_FLANK = 5000
 
 def _download(url, destination):
     request = urllib.request.Request(
-        url, headers={"User-Agent": "BioSeq/1.0 (GIAB benchmark preparation)"}
+        url, headers={"User-Agent": "SeqCheckFlow/1.0 (GIAB benchmark preparation)"}
     )
     temporary_path = f"{destination}.part"
     try:
@@ -101,7 +101,7 @@ def _read_extraction_region(contig, start, end):
 
 
 def _extract_paired_fastq(samtools, threads, regional_bam, read1, read2):
-    with tempfile.TemporaryDirectory(prefix="bioseq-giab-") as temporary_directory:
+    with tempfile.TemporaryDirectory(prefix="seqcheckflow-giab-") as temporary_directory:
         name_collated_bam = os.path.join(temporary_directory, "regional.name_collated.bam")
         run_command(
             [

@@ -1,6 +1,6 @@
-# BioSeq Architecture
+# SeqCheckFlow Architecture
 
-BioSeq is a bioinformatics project with three deliberately separate execution
+SeqCheckFlow is a bioinformatics project with three deliberately separate execution
 paths:
 
 1. A lightweight CLI that validates and summarizes one input file.
@@ -17,14 +17,14 @@ The CLI does not implicitly download data, align reads, or call variants.
 ```mermaid
 flowchart LR
     User[User / shell]
-    CLI[bioseq.pipeline CLI]
+    CLI[seqcheckflow.pipeline CLI]
     Detect[Format detection and validation]
     Analyze[Format-specific analysis]
     Reports[JSON and text reports]
     Source[(Local FASTA / FASTQ / VCF / BAM / CRAM)]
-    Download[bioseq.download]
+    Download[seqcheckflow.download]
     NCBI[NCBI Entrez / SRA / direct HTTP URLs]
-    Blast[bioseq.blast]
+    Blast[seqcheckflow.blast]
     NCBIBlast[NCBI remote BLAST service]
 
     User --> CLI
@@ -43,18 +43,18 @@ failure modes.
 
 | Component | Responsibility |
 | --- | --- |
-| `bioseq.pipeline` | CLI and orchestration for a single input-file validation and summary. |
-| `bioseq.validation` | Detects supported formats and validates FASTA, FASTQ, VCF, BAM, and CRAM. |
-| `bioseq.fasta`, `bioseq.fastq`, `bioseq.variants`, `bioseq.qc` | Parse records and calculate sequence, variant, and read-quality metrics. |
-| `bioseq.samtools` | Wraps `samtools` checks and alignment summaries including flagstat, stats, coverage, sorting, duplicate marking, and indexing. |
-| `bioseq.report` | Emits JSON and plain-text reports for the single-file CLI. |
-| `bioseq.download` | NCBI sequence search/download, SRA FASTQ conversion, and direct-URL VCF/BAM/CRAM downloads. |
-| `bioseq.blast` | Submits remote NCBI BLAST requests and summarizes returned hits. |
-| `bioseq.alignment` | Standalone alignment and SAM-to-BAM wrappers for BWA or minimap2. |
-| `bioseq.giab_data` | Prepares the small regional HG002 benchmark inputs from public resources. |
-| `bioseq.workflow` | Runs one germline workflow using either BioSeq wrappers or direct tool invocations and records stage metrics. |
-| `bioseq.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
-| `bioseq.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
+| `seqcheckflow.pipeline` | CLI and orchestration for a single input-file validation and summary. |
+| `seqcheckflow.validation` | Detects supported formats and validates FASTA, FASTQ, VCF, BAM, and CRAM. |
+| `seqcheckflow.fasta`, `seqcheckflow.fastq`, `seqcheckflow.variants`, `seqcheckflow.qc` | Parse records and calculate sequence, variant, and read-quality metrics. |
+| `seqcheckflow.samtools` | Wraps `samtools` checks and alignment summaries including flagstat, stats, coverage, sorting, duplicate marking, and indexing. |
+| `seqcheckflow.report` | Emits JSON and plain-text reports for the single-file CLI. |
+| `seqcheckflow.download` | NCBI sequence search/download, SRA FASTQ conversion, and direct-URL VCF/BAM/CRAM downloads. |
+| `seqcheckflow.blast` | Submits remote NCBI BLAST requests and summarizes returned hits. |
+| `seqcheckflow.alignment` | Standalone alignment and SAM-to-BAM wrappers for BWA or minimap2. |
+| `seqcheckflow.giab_data` | Prepares the small regional HG002 benchmark inputs from public resources. |
+| `seqcheckflow.workflow` | Runs one germline workflow using either SeqCheckFlow wrappers or direct tool invocations and records stage metrics. |
+| `seqcheckflow.benchmark` | Uses RTG `vcfeval` to compare baseline/candidate VCF calls with a truth set. |
+| `seqcheckflow.full_benchmark` | Runs the two workflows, verifies comparable tool/stage sets, computes metric deltas, and writes the combined JSON report. |
 | `containers/`, `compose.yaml` | Provide a Docker environment with pinned benchmark tool versions. |
 | `main.nf`, `analysis/airway_samples.tsv`, `analysis/rnaseq_airway_deseq2.R` | Download public paired FASTQs, run fastp and Salmon, aggregate QC/quantification summaries with MultiQC, and analyze gene-level differential expression with tximport/DESeq2. |
 | `hg002.nf` | Prepare the public GIAB inputs and run each alignment, processing, calling, QC, and truth-scoring stage as a separate Nextflow task. |
@@ -90,15 +90,15 @@ interpret biological function, align reads, or call variants.
 
 ```mermaid
 flowchart LR
-    Public[GIAB HG002 indexed BAM] --> Prepare[bioseq.giab_data]
+    Public[GIAB HG002 indexed BAM] --> Prepare[seqcheckflow.giab_data]
     Public --> Truth[GIAB truth VCF and confident BED]
     Broad[Broad known-sites VCF] --> Prepare
     UCSC[GRCh38 chr20 reference] --> Prepare
     Prepare --> Inputs[Paired FASTQ, reference, known sites, truth, BED, RTG SDF]
     Inputs --> Baseline[Direct BWA / samtools / GATK commands]
-    Inputs --> Wrappers[BioSeq wrapper workflow]
+    Inputs --> Wrappers[SeqCheckFlow wrapper workflow]
     Baseline --> BaseVCF[Baseline VCF and workflow metrics]
-    Wrappers --> CandidateVCF[BioSeq VCF and workflow metrics]
+    Wrappers --> CandidateVCF[SeqCheckFlow VCF and workflow metrics]
     BaseVCF --> Eval[RTG vcfeval against GIAB truth in confident regions]
     CandidateVCF --> Eval
     Eval --> Comparison[comparison.json: accuracy and performance deltas]
@@ -117,7 +117,7 @@ SAM-to-BAM conversion, name sorting, fixmate, coordinate sorting, duplicate
 marking/indexing, BaseRecalibrator, ApplyBQSR, HaplotypeCaller, VCF QC, and RTG
 `vcfeval` truth scoring as distinct Nextflow processes. This DAG uses direct
 CLI invocations so Nextflow owns stage scheduling and reports. The separate
-`bioseq.full_benchmark` command remains available to compare the wrappers with
+`seqcheckflow.full_benchmark` command remains available to compare the wrappers with
 direct tool invocations. Public input preparation is uncached and currently
 limited to chr20.
 
@@ -146,7 +146,7 @@ produces a downloadable artifact with the QC and analysis outputs.
 | `results/` | Single-file reports and benchmark run outputs. | Generated contents ignored; `.gitkeep` preserves the directory. |
 
 The single-file CLI writes paired JSON/text reports. The end-to-end benchmark
-writes per-stage JSON manifests under `baseline/` and `bioseq/`, RTG output
+writes per-stage JSON manifests under `baseline/` and `seqcheckflow/`, RTG output
 under `truth_evaluation/`, and a top-level `comparison.json`. Benchmark
 manifests include software versions, input checksums, parameters, per-stage
 wall/CPU/RSS/output-size measures, and truth metrics.
@@ -189,7 +189,7 @@ same underlying tools with the same settings; the comparison checks wrapper
 parity, not a new algorithm's accuracy.
 
 One run measured 327.71 seconds for the direct baseline and 302.35 seconds for
-the BioSeq wrappers. This is an observation, not a statistically supported
+the SeqCheckFlow wrappers. This is an observation, not a statistically supported
 speedup; repeated runs are needed to estimate variability. The benchmark is a
 regional small-variant pilot, not whole-genome testing, full GATK Best
 Practices, clinical validation, or biological interpretation.

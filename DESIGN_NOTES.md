@@ -1,4 +1,4 @@
-# BioSeq Design Notes
+# SeqCheckFlow Design Notes
 
 This guide answers the biological and software questions that inform the
 current implementation. For component boundaries and data flow, see
@@ -47,7 +47,7 @@ that an individual base is correct.
 Low-quality reads or bases can introduce false alignments and variant calls.
 Filtering or trimming can reduce those errors, but removes data and may bias
 coverage, so thresholds should be chosen and recorded for the experiment.
-BioSeq's FASTQ QC currently reports read-quality metrics and the count below a
+SeqCheckFlow's FASTQ QC currently reports read-quality metrics and the count below a
 mean-quality threshold; it does **not** filter or trim reads.
 
 ### BLAST
@@ -132,7 +132,7 @@ bases with at least one aligned base.
 ## Software questions
 
 **What should happen when an input file is malformed?**
-BioSeq should reject it, identify the format and validation problem, and stop
+SeqCheckFlow should reject it, identify the format and validation problem, and stop
 before presenting success-shaped analysis output. The CLI reports an error
 and exits unsuccessfully. FASTA/FASTQ/VCF validators check their supported
 structural rules; BAM/CRAM integrity checks use `samtools quickcheck`. Passing
@@ -156,7 +156,7 @@ reference assembly and contig/region, input paths and checksums, tool names and
 versions, command parameters, filters, known-sites and truth-set versions,
 workflow implementation, and run date/environment. For benchmark reproducibility,
 also preserve per-stage wall time, CPU/RSS measurements, output sizes, and
-truth-evaluation definitions. BioSeq's full benchmark records many of these
+truth-evaluation definitions. SeqCheckFlow's full benchmark records many of these
 fields and hashes the reads, reference, known-sites file, truth VCF, confident
 regions, and reference SDF.
 
@@ -186,7 +186,7 @@ Requirements depend on the selected path:
 
 ## Current scope reminder
 
-`bioseq.pipeline` validates and summarizes one supplied FASTA, FASTQ, VCF,
+`seqcheckflow.pipeline` validates and summarizes one supplied FASTA, FASTQ, VCF,
 BAM, or CRAM at a time. It does not automatically download, align, or call
 variants. The separate HG002 benchmark connects paired FASTQ alignment to
 variant calling and truth evaluation for a defined small region. See

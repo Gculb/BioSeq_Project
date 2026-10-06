@@ -6,7 +6,7 @@ params.threads = 2
 params.ensembl_release = "112"
 
 process DOWNLOAD_READS {
-    container "bioseq-rnaseq:latest"
+    container "seqcheckflow-rnaseq:latest"
     cpus 1
     maxForks 1
 
@@ -36,7 +36,7 @@ process DOWNLOAD_READS {
 }
 
 process FASTP {
-    container "bioseq-rnaseq:latest"
+    container "seqcheckflow-rnaseq:latest"
     cpus params.threads
     maxForks 1
     publishDir "${params.outdir}/qc", mode: "copy", pattern: "*fastp.*"
@@ -66,7 +66,7 @@ process FASTP {
 }
 
 process SALMON_INDEX {
-    container "bioseq-rnaseq:latest"
+    container "seqcheckflow-rnaseq:latest"
     cpus params.threads
 
     output:
@@ -99,7 +99,7 @@ process SALMON_INDEX {
 }
 
 process SALMON_QUANT {
-    container "bioseq-rnaseq:latest"
+    container "seqcheckflow-rnaseq:latest"
     cpus params.threads
     maxForks 1
     publishDir "${params.outdir}/quant", mode: "copy", pattern: "*.quant.sf"
@@ -167,7 +167,7 @@ process MULTIQC {
 }
 
 process DESEQ2 {
-    container "bioseq-rnaseq:latest"
+    container "seqcheckflow-rnaseq:latest"
     publishDir "${params.outdir}/results", mode: "copy"
 
     input:

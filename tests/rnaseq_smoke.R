@@ -6,7 +6,7 @@ if (length(args) != 1 || !file.exists(args[[1]])) {
 local({
 analysis_script <- normalizePath(args[[1]])
 original_wd <- getwd()
-work_dir <- tempfile("bioseq-rnaseq-smoke-")
+work_dir <- tempfile("seqcheckflow-rnaseq-smoke-")
 dir.create(work_dir)
 on.exit({
   setwd(original_wd)

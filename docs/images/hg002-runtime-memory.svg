@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="390" viewBox="0 0 920 390" role="img" aria-labelledby="title desc">
   <title id="title">HG002 pilot runtime and sampled memory comparison</title>
-  <desc id="desc">In one run, the direct baseline took 327.71 seconds and used 584.5 MiB peak sampled process-tree RSS; BioSeq wrappers took 302.35 seconds and used 561.6 MiB.</desc>
+  <desc id="desc">In one run, the direct baseline took 327.71 seconds and used 584.5 MiB peak sampled process-tree RSS; SeqCheckFlow wrappers took 302.35 seconds and used 561.6 MiB.</desc>
   <rect width="920" height="390" fill="#ffffff"/>
   <text x="36" y="42" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#172b4d">HG002 chr20 runtime and sampled memory</text>
   <text x="36" y="70" font-family="Arial, sans-serif" font-size="14" fill="#526174">Single measurement per implementation; performance differences are preliminary</text>
   <rect x="600" y="91" width="14" height="14" rx="2" fill="#355c9a"/>
   <text x="621" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">Direct-tool baseline</text>
   <rect x="762" y="91" width="14" height="14" rx="2" fill="#24a18a"/>
-  <text x="783" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">BioSeq wrappers</text>
+  <text x="783" y="103" font-family="Arial, sans-serif" font-size="13" fill="#26354a">SeqCheckFlow wrappers</text>
   <text x="36" y="146" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#26354a">Total workflow wall time</text>
   <text x="36" y="176" font-family="Arial, sans-serif" font-size="13" fill="#526174">Direct baseline</text>
-  <text x="36" y="205" font-family="Arial, sans-serif" font-size="13" fill="#526174">BioSeq wrappers</text>
+  <text x="36" y="205" font-family="Arial, sans-serif" font-size="13" fill="#526174">SeqCheckFlow wrappers</text>
   <rect x="170" y="160" width="500" height="19" rx="4" fill="#edf1f5"/>
   <rect x="170" y="189" width="500" height="19" rx="4" fill="#edf1f5"/>
   <rect x="170" y="160" width="455.2" height="19" rx="4" fill="#355c9a"/>
@@ -19,7 +19,7 @@
   <text x="645" y="205" font-family="Arial, sans-serif" font-size="13" fill="#26354a">302.35 s (-7.7%)</text>
   <text x="36" y="260" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#26354a">Peak sampled process-tree RSS</text>
   <text x="36" y="290" font-family="Arial, sans-serif" font-size="13" fill="#526174">Direct baseline</text>
-  <text x="36" y="319" font-family="Arial, sans-serif" font-size="13" fill="#526174">BioSeq wrappers</text>
+  <text x="36" y="319" font-family="Arial, sans-serif" font-size="13" fill="#526174">SeqCheckFlow wrappers</text>
   <rect x="170" y="274" width="500" height="19" rx="4" fill="#edf1f5"/>
   <rect x="170" y="303" width="500" height="19" rx="4" fill="#edf1f5"/>
   <rect x="170" y="274" width="449.6" height="19" rx="4" fill="#355c9a"/>

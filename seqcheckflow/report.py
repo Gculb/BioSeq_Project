@@ -18,7 +18,7 @@ def write_report(report_data, output_dir, report_name):
         file_handle.write("\n")
 
     with open(text_path, "w", encoding="utf-8") as file_handle:
-        file_handle.write("BioSeq analysis report\n")
+        file_handle.write("SeqCheckFlow analysis report\n")
         file_handle.write("======================\n\n")
         file_handle.write(f"Input: {report_data['input']}\n")
         file_handle.write(f"Format: {report_data['format'].upper()}\n")

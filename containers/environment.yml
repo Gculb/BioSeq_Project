@@ -1,4 +1,4 @@
-name: bioseq
+name: seqcheckflow
 channels:
   - conda-forge
   - bioconda
